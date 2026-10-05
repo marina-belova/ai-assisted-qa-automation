@@ -1,7 +1,43 @@
 # Test Plan: Edit Existing Program Details (DS-2)
 
 **Feature:** Edit existing program details  
-**Ticket:** DS-2
+**Ticket:** DS-2  
+**User story:** As an admin user, I want to edit an existing program's details so that I can correct or update program information after creation.
+
+## Jira Acceptance Criteria Mapping
+
+| Jira scenario | Test case |
+|---------------|-----------|
+| Open program for editing | TC-001 |
+| Successfully edit a program name | TC-002 |
+| Edit preserves unchanged fields | TC-003 |
+
+**Note:** Jira ACs refer to the name field as **Name**; the Didaxis Studio UI labels this field **Program Name**. Steps below use the Jira wording where they trace directly to an AC; expected results call out the UI label where relevant.
+
+## UI Inspection Notes (Playwright MCP — Didaxis Studio)
+
+Verified on `https://test.didaxis.studio/programs` (admin session):
+
+| Element | Verified locator / behavior |
+|---------|----------------------------|
+| Programs page | URL `/programs`; heading **Programs**; subtitle *Manage academic programs and semesters* |
+| New Program | `getByRole('button', { name: '+ New Program', exact: true })` |
+| Program list | Single visible column header **Program**; each row cell shows **name** and **description** as separate paragraphs |
+| Edit control | `getByRole('button', { name: 'Edit {programName}', exact: true })` — not a standalone icon (Jira AC says "edit icon") |
+| Delete control | `getByRole('button', { name: 'Delete {programName}', exact: true })` |
+| Edit dialog | `getByRole('dialog', { name: 'Edit Program' })` |
+| Program Name field | `dialog.getByLabel('Program Name')` — required (`*`) |
+| Description field | `dialog.getByLabel('Description')` — optional |
+| Save | `dialog.getByRole('button', { name: 'Save' })` |
+| Cancel | `dialog.getByRole('button', { name: 'Cancel' })` |
+| Close (X) | Banner button with no accessible name — prefer **Cancel** for dismiss tests |
+| Additional fields | Edit dialog also exposes **Show AI Generation Config** (Total Program Hours, Default Session/Hours, Target Audience, Focus Areas, Sync/Async Ratio) — not in DS-2 Jira ACs |
+| Save on open | Save is **enabled** when the edit dialog opens, even with no changes |
+| Empty / whitespace name | Clearing Program Name or entering only spaces **disables** Save |
+| Rename save | Modal closes; list updates in place without full page reload |
+| Description-only save | Program Name unchanged; updated description appears as the second paragraph in the list row |
+| Duplicate rename | Save succeeds; duplicate names can coexist in the list (no error alert) |
+| Scale | Programs list is very large (thousands of rows), which slows DOM queries and create/edit setup |
 
 ---
 
@@ -9,6 +45,7 @@
 
 ### TC-001: Edit form opens pre-populated with current program data
 
+**Covers AC:** Open program for editing  
 **Priority:** High
 
 **Preconditions:**
@@ -21,12 +58,13 @@
 3. When I click the edit icon on "Web Development 2026"
 4. Then I see the edit form pre-populated with the program's current data
 
-**Expected result:** Edit modal opens with Name field showing "Web Development 2026" and Description field showing "Full-stack web development program".
+**Expected result:** **Edit Program** modal opens with Program Name showing "Web Development 2026" and Description showing "Full-stack web development program". Save and Cancel are visible. In the UI, the edit action is a button named `Edit Web Development 2026` (Jira AC wording: "edit icon").
 
 ---
 
 ### TC-002: Program name is updated and reflected immediately in the list
 
+**Covers AC:** Successfully edit a program name  
 **Priority:** High
 
 **Preconditions:**
@@ -40,12 +78,13 @@
 4. Then the modal closes
 5. And the program list immediately shows "Web Development 2026 - Updated"
 
-**Expected result:** Updated name appears in the list without page refresh; old name "Web Development 2026" is no longer displayed.
+**Expected result:** The modal closes without a full page reload. The list row shows "Web Development 2026 - Updated" as the first paragraph in the **Program** column; the old exact name is no longer displayed.
 
 ---
 
 ### TC-003: Unchanged fields are preserved when only Description is edited
 
+**Covers AC:** Edit preserves unchanged fields  
 **Priority:** High
 
 **Preconditions:**
@@ -54,11 +93,11 @@
 
 **Steps:**
 1. Given I am editing a program
-2. When I only change the Description to "Updated full-stack curriculum for 2026"
+2. When I only change the Description
 3. And I click Save
 4. Then the Name and other fields remain unchanged
 
-**Expected result:** Program name remains "Web Development 2026"; only the description is updated in the list and backend.
+**Expected result:** Program Name remains "Web Development 2026". Only the Description is updated — visible as the second paragraph in the list row and on reopening the edit form. (A concrete replacement description such as "Updated full-stack curriculum for 2026" may be used during execution to verify the change.)
 
 ---
 
@@ -155,6 +194,8 @@
 
 **Expected result:** Duplicate name error is shown; "Data Science 2026" retains its original name.
 
+> **Scope note:** Duplicate prevention is not stated in DS-2 Jira ACs (see DS-3 for create-time duplicate rules). This case extends coverage for rename collisions and is retained as a negative flow.
+
 ---
 
 ### TC-009: Non-admin user cannot edit programs
@@ -169,7 +210,7 @@
 1. Given I am logged in as a non-admin user
 2. And I am on the Programs page
 3. When I view the program "Web Development 2026"
-4. Then I do not see an edit icon
+4. Then I do not see an Edit button for the program
 5. And I cannot open the edit form
 
 **Expected result:** Edit functionality is unavailable to non-admin users.
@@ -191,7 +232,7 @@
 4. Then the modal closes
 5. And the program list shows unchanged data for "Web Development 2026"
 
-**Expected result:** No erroneous update or error; program data remains the same (or Save is disabled until a change is made).
+**Expected result:** No erroneous update or error; program data remains the same. **Observed UI:** Save is enabled even when no fields were changed; clicking Save closes the modal without altering data.
 
 ---
 
@@ -272,6 +313,8 @@
 
 **Expected result:** Validation error prevents save; original name is preserved.
 
+> **Scope note:** Max-length limits are not specified in DS-2 Jira ACs. The 255-character boundary follows DS-1 create-form conventions and is retained as an edge case.
+
 ---
 
 ### TC-015: Description can be cleared to empty on edit
@@ -312,14 +355,45 @@
 
 ---
 
-## Ambiguities and Gaps in the Acceptance Criteria
+## Comparison with Jira (DS-2)
 
-1. **Field label inconsistency:** Creation form uses "Program Name" (DS-1) while edit form uses "Name" (DS-2) — unclear if labels differ or it is the same field.
-2. **Save button state:** No AC specifies when Save is enabled/disabled (e.g., no changes, invalid name).
-3. **Duplicate name on edit:** Not covered in DS-2 ACs; behavior when renaming to an existing name is undefined.
-4. **Description required on edit:** Unclear whether Description can be cleared during edit.
-5. **Non-admin access:** No AC addresses role-based edit restrictions.
-6. **Cancel/dismiss behavior:** No AC for Cancel, Escape, or overlay click during edit.
-7. **Immediate list update:** AC says "immediately shows" but does not define behavior if the API call fails (optimistic vs. confirmed update).
-8. **Max-length validation:** No limits specified for Name or Description on edit.
-9. **Concurrent editing:** No guidance on multi-user edit scenarios.
+### Aligned with Jira
+
+| Area | Jira | Test plan |
+|------|------|-----------|
+| Title | Edit existing program details | Matches |
+| AC: open edit form | Pre-populated form after clicking edit control (`Edit {name}` button in UI) | TC-001 |
+| AC: rename program | Save closes modal; list updates immediately | TC-002 |
+| AC: partial edit | Description-only edit preserves Name and other fields | TC-003 |
+
+### Gaps in Jira ACs (covered by extended test cases)
+
+1. **Admin login:** Not stated in the open-form AC; assumed as a precondition for all scenarios.
+2. **Field label:** Jira uses **Name**; UI uses **Program Name** — documented above, not a functional mismatch.
+3. **Edit control type:** Jira AC says "edit icon"; UI exposes a named **Edit {programName}** button — functionally equivalent, different locator.
+4. **List layout:** Jira AC references the program list but not that description is shown inline in the **Program** column — verified during TC-002/TC-003.
+5. **Extra edit fields:** AI Generation Config fields appear in the edit modal but are not mentioned in DS-2 ACs.
+6. **Cancel/dismiss:** No AC for Cancel, Escape, or overlay click — covered by TC-006.
+7. **Save button state:** No AC for enabled/disabled rules — covered by TC-005, TC-007, TC-010, TC-012.
+8. **Duplicate name on edit:** Not in DS-2 ACs — covered by TC-008 (see also DS-3 for create-time rules).
+9. **Description required on edit:** AC does not say whether Description can be cleared — covered by TC-015.
+10. **Non-admin access:** No role-based AC — covered by TC-009.
+11. **Max-length validation:** No limits in DS-2 ACs — covered by TC-013, TC-014 (inferred from DS-1).
+12. **Concurrent editing:** No multi-user guidance — covered by TC-016.
+13. **Combined field edit:** No AC for updating both fields at once — covered by TC-004.
+14. **Special characters:** Not in DS-2 ACs — covered by TC-011.
+15. **Large program list / performance:** No AC for setup time with thousands of existing programs — affects automation reliability.
+16. **Failed save / list refresh:** AC says list updates "immediately" but does not define behavior on API failure — not yet covered.
+
+### Known application discrepancies (observed vs. expected)
+
+These do not change Jira AC expectations; they document gaps found during QA automation:
+
+| Test case | Expected (test plan) | Observed behavior |
+|-----------|----------------------|-------------------|
+| TC-008 | Duplicate name rejected on edit | Rename to an existing name succeeds; a second list row with the same name appears; no error alert |
+| TC-014 | 256-character name rejected | Program Name has no enforced max length on edit |
+| TC-010 | Save disabled until a change is made (optional) | Save is enabled on dialog open even with no edits |
+| TC-009 | Non-admin cannot edit | Only an admin account is configured for automation |
+| TC-016 | Concurrent edit handling | Only one admin account is configured for automation |
+| Setup (all cases) | Programs page loads quickly | Very large program list slows row lookup and create/edit setup |

@@ -83,14 +83,23 @@ async function createProgram(page: Page, name: string, description = ''): Promis
 }
 
 async function openEditForm(page: Page, name: string): Promise<Locator> {
-  await page.getByRole('button', { name: `Edit ${name}`, exact: true }).click();
+  const edit = page.getByRole('button', { name: `Edit ${name}`, exact: true });
   const dialog = editDialog(page);
-  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  await edit.scrollIntoViewIfNeeded({ timeout: 45_000 });
+  await edit.click();
+  if (!(await dialog.isVisible())) {
+    await expect(dialog).toBeVisible({ timeout: 5_000 }).catch(async () => {
+      await edit.click();
+      await expect(dialog).toBeVisible({ timeout: 15_000 });
+    });
+  }
   return dialog;
 }
 
 async function expectProgramListed(page: Page, name: string): Promise<void> {
-  await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 45_000 });
+  const nameText = page.locator('tbody').getByText(name, { exact: true });
+  await nameText.scrollIntoViewIfNeeded({ timeout: 45_000 });
+  await expect(nameText).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {

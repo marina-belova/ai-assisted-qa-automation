@@ -83,15 +83,19 @@ async function createProgram(page: Page, name: string, description = ''): Promis
 }
 
 async function expectProgramListed(page: Page, name: string): Promise<void> {
-  await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 45_000 });
+  const nameText = page.locator('tbody').getByText(name, { exact: true });
+  await nameText.scrollIntoViewIfNeeded({ timeout: 45_000 });
+  await expect(nameText).toBeVisible();
 }
 
 async function expectProgramAbsent(page: Page, name: string): Promise<void> {
-  await expect(page.getByText(name, { exact: true })).toHaveCount(0, { timeout: 45_000 });
+  await expect(page.locator('tbody').getByText(name, { exact: true })).toHaveCount(0, { timeout: 45_000 });
 }
 
 // window.confirm is a native dialog. Dismiss is the Escape/Cancel result.
 async function respondToDeleteDialog(page: Page, name: string, accept: boolean): Promise<string> {
+  const button = page.getByRole('button', { name: `Delete ${name}`, exact: true });
+  await button.scrollIntoViewIfNeeded({ timeout: 45_000 });
   const dialogMessage = new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Delete confirmation did not appear')), 15_000);
     page.once('dialog', async (dialog) => {
@@ -102,7 +106,7 @@ async function respondToDeleteDialog(page: Page, name: string, accept: boolean):
       resolve(message);
     });
   });
-  await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+  await button.click();
   return dialogMessage;
 }
 

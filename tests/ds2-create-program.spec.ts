@@ -7,15 +7,12 @@ import { test, expect, type Locator, type Page, type Response } from '@playwrigh
  */
 test.describe.configure({ mode: 'default', timeout: 180_000 });
 
-const baseUrl = process.env.DIDAXIS_URL?.replace(/\/$/, '');
-const email = process.env.DIDAXIS_EMAIL;
-const password = process.env.DIDAXIS_PASSWORD;
-
-function requireCredentials(): { baseUrl: string; email: string; password: string } {
-  if (!baseUrl || !email || !password) {
-    throw new Error('DIDAXIS_URL, DIDAXIS_EMAIL, and DIDAXIS_PASSWORD must be set');
+function requireBaseUrl(): string {
+  const baseUrl = process.env.DIDAXIS_URL?.replace(/\/$/, '');
+  if (!baseUrl) {
+    throw new Error('DIDAXIS_URL must be set');
   }
-  return { baseUrl, email, password };
+  return baseUrl;
 }
 
 function uniqueName(base: string): string {
@@ -49,15 +46,6 @@ function isProgramItemResponse(response: Response, method: string): boolean {
     /\/api\/programs\/[^/]+$/.test(new URL(response.url()).pathname) &&
     response.ok()
   );
-}
-
-async function login(page: Page): Promise<void> {
-  const credentials = requireCredentials();
-  await page.goto(`${credentials.baseUrl}/login`);
-  await page.getByLabel('Email').fill(credentials.email);
-  await page.getByLabel('Password').fill(credentials.password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'));
 }
 
 async function openCreateForm(page: Page): Promise<Locator> {
@@ -122,9 +110,8 @@ function trackReloads(page: Page): () => number {
 }
 
 test.beforeEach(async ({ page }) => {
-  await login(page);
   const listed = page.waitForResponse((response) => isProgramsResponse(response, 'GET'), { timeout: 60_000 });
-  await page.goto(`${requireCredentials().baseUrl}/programs`);
+  await page.goto(`${requireBaseUrl()}/programs`);
   await listed;
   await expect(page.getByRole('button', { name: '+ New Program', exact: true })).toBeVisible({ timeout: 30_000 });
 });

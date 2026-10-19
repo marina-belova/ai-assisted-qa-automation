@@ -4,15 +4,12 @@ import type { Locator, Page } from '@playwright/test';
 // Override fullyParallel so this file's tests stay isolated under API load.
 test.describe.configure({ mode: 'default', timeout: 90_000 });
 
-const baseUrl = process.env.DIDAXIS_URL?.replace(/\/$/, '');
-const email = process.env.DIDAXIS_EMAIL;
-const password = process.env.DIDAXIS_PASSWORD;
-
-function requireCredentials(): { baseUrl: string; email: string; password: string } {
-  if (!baseUrl || !email || !password) {
-    throw new Error('DIDAXIS_URL, DIDAXIS_EMAIL, and DIDAXIS_PASSWORD must be set');
+function requireBaseUrl(): string {
+  const baseUrl = process.env.DIDAXIS_URL?.replace(/\/$/, '');
+  if (!baseUrl) {
+    throw new Error('DIDAXIS_URL must be set');
   }
-  return { baseUrl, email, password };
+  return baseUrl;
 }
 
 function uniqueName(base: string): string {
@@ -25,15 +22,6 @@ function createDialog(page: Page): Locator {
 
 function programCell(page: Page, name: string): Locator {
   return page.getByRole('cell').filter({ has: page.getByText(name, { exact: true }) });
-}
-
-async function login(page: Page): Promise<void> {
-  const credentials = requireCredentials();
-  await page.goto(`${credentials.baseUrl}/login`);
-  await page.getByLabel('Email').fill(credentials.email);
-  await page.getByLabel('Password').fill(credentials.password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith('/login'));
 }
 
 async function openCreateForm(page: Page): Promise<Locator> {
@@ -67,8 +55,7 @@ async function expectProgramListed(page: Page, name: string): Promise<void> {
 }
 
 test.beforeEach(async ({ page }) => {
-  await login(page);
-  await page.goto(`${requireCredentials().baseUrl}/programs`);
+  await page.goto(`${requireBaseUrl()}/programs`);
   await expect(page.getByRole('button', { name: '+ New Program', exact: true })).toBeVisible();
 });
 

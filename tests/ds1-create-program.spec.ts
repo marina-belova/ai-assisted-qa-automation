@@ -1,4 +1,5 @@
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
+import type { Locator, Page } from '@playwright/test';
 
 // Override fullyParallel so this file's tests stay isolated under API load.
 test.describe.configure({ mode: 'default', timeout: 90_000 });
@@ -46,13 +47,19 @@ function isProgramsResponse(response: { url(): string; ok(): boolean; request():
   return response.request().method() === method && new URL(response.url()).pathname === '/api/programs' && response.ok();
 }
 
-async function submitCreate(page: Page, dialog: Locator): Promise<void> {
+async function submitCreate(page: Page, dialog: Locator): Promise<string> {
   const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
   await dialog.getByRole('button', { name: 'Create' }).click();
-  await created;
+  const response = await created;
+  const body = (await response.json()) as { data?: { id?: string } };
+  const uuid = body.data?.id;
+  if (!uuid) {
+    throw new Error('Create program response did not include data.id');
+  }
   await expect(dialog).toBeHidden({ timeout: 15_000 });
   await page.reload();
   await expect(page.getByRole('button', { name: '+ New Program', exact: true })).toBeVisible();
+  return uuid;
 }
 
 async function expectProgramListed(page: Page, name: string): Promise<void> {
@@ -75,26 +82,26 @@ test.describe('Positive flows', () => {
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
 
-  test('TC-002: program is created successfully with valid name and description', async ({ page }) => {
+  test('TC-002: program is created successfully with valid name and description', async ({ page, trackProgram }) => {
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
     const dialog = await openCreateForm(page);
 
     await dialog.getByLabel('Program Name').fill(name);
     await dialog.getByLabel('Description').fill(description);
-    await submitCreate(page, dialog);
+    trackProgram(await submitCreate(page, dialog));
 
     await expectProgramListed(page, name);
     await expect(programCell(page, name).getByText(description, { exact: true })).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
 
-  test('TC-003: program is created successfully with name only and empty description', async ({ page }) => {
+  test('TC-003: program is created successfully with name only and empty description', async ({ page, trackProgram }) => {
     const name = uniqueName('Data Science Fundamentals');
     const dialog = await openCreateForm(page);
 
     await dialog.getByLabel('Program Name').fill(name);
-    await submitCreate(page, dialog);
+    trackProgram(await submitCreate(page, dialog));
 
     await expectProgramListed(page, name);
     await expect(page.getByRole('cell', { name, exact: true })).toHaveText(name);
@@ -148,14 +155,14 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-010: program name at maximum allowed length is accepted', async ({ page }) => {
+  test('TC-010: program name at maximum allowed length is accepted', async ({ page, trackProgram }) => {
     const suffix = ` ${Date.now()}`;
     const name = `${'A'.repeat(255 - suffix.length)}${suffix}`;
     const dialog = await openCreateForm(page);
 
     await dialog.getByLabel('Program Name').fill(name);
     await dialog.getByLabel('Description').fill('Boundary length test');
-    await submitCreate(page, dialog);
+    trackProgram(await submitCreate(page, dialog));
 
     await expectProgramListed(page, name);
   });
@@ -163,13 +170,13 @@ test.describe('Edge cases', () => {
   // Program Name has no maximum length; a 256-character name is saved.
   test.skip('TC-011: program name exceeding maximum length is rejected', async () => {});
 
-  test('TC-012: program name with special characters is accepted', async ({ page }) => {
+  test('TC-012: program name with special characters is accepted', async ({ page, trackProgram }) => {
     const name = uniqueName('Informatique & IA - Niveau 2');
     const dialog = await openCreateForm(page);
 
     await dialog.getByLabel('Program Name').fill(name);
     await dialog.getByLabel('Description').fill('Program with special characters');
-    await submitCreate(page, dialog);
+    trackProgram(await submitCreate(page, dialog));
 
     await expectProgramListed(page, name);
   });
@@ -183,7 +190,7 @@ test.describe('Edge cases', () => {
     await expect(dialog).toBeVisible();
   });
 
-  test('TC-014: description at maximum allowed length is accepted', async ({ page }) => {
+  test('TC-014: description at maximum allowed length is accepted', async ({ page, trackProgram }) => {
     const name = uniqueName('Long Description Program');
     const marker = `D${Date.now()}`;
     const description = `${marker}${'D'.repeat(1000 - marker.length)}`;
@@ -191,7 +198,7 @@ test.describe('Edge cases', () => {
 
     await dialog.getByLabel('Program Name').fill(name);
     await dialog.getByLabel('Description').fill(description);
-    await submitCreate(page, dialog);
+    trackProgram(await submitCreate(page, dialog));
 
     await expectProgramListed(page, name);
     await expect(programCell(page, name).getByText(description, { exact: true })).toBeVisible();

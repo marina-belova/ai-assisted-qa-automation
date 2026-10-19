@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "cleanup:programs": "node scripts/manual/run-cleanup.mjs"
   },
   "repository": {
     "type": "git",

@@ -13,6 +13,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
  */
 export default defineConfig({
   testDir: './tests',
+  testIgnore: ['**/scripts/manual/**', '**/*.manual.spec.ts', '**/cleanup.programs.spec.ts'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

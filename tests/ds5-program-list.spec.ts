@@ -31,15 +31,6 @@ test.describe('Positive flows', () => {
     await expect(programs.textInProgramCell(dataName, dataDescription)).toBeVisible();
   });
 
-  // The empty state is only rendered when the catalog has zero programs.
-  test.skip('TC-002: empty state is shown when no programs exist — the shared catalog is not empty', async () => {});
-
-  // The empty-state create prompt is only rendered when the catalog has zero programs.
-  test.skip('TC-003: empty state create prompt opens the program creation form — the shared catalog is not empty', async () => {});
-
-  // The empty-to-populated transition requires starting from zero programs.
-  test.skip('TC-004: program list updates immediately after creating a new program — the shared catalog is not empty', async () => {});
-
   test('TC-005: program list updates immediately after editing a program', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
@@ -109,9 +100,6 @@ test.describe('Negative flows', () => {
     await expect(programs.programNameText(existingName)).toBeVisible();
   });
 
-  // Only an admin account is configured, so a non-admin session cannot be started.
-  test.skip('TC-008: non-admin user can view the program list but cannot create from empty state actions — only an admin account is configured', async () => {});
-
   test('TC-009: program list does not display internal or system fields', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
@@ -126,9 +114,6 @@ test.describe('Negative flows', () => {
     expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
-
-  // A failed programs request leaves the list empty and shows the empty state. No error message or retry control is rendered.
-  test.skip('TC-010: error state is shown when program list fails to load — a failed load shows the empty state', async () => {});
 });
 
 test.describe('Edge cases', () => {
@@ -220,9 +205,6 @@ test.describe('Edge cases', () => {
     const orderOf = (indexes: number[]) => indexes.map((index, position) => position).sort((left, right) => indexes[left] - indexes[right]);
     expect(orderOf(after)).toEqual(orderOf(before));
   });
-
-  // Reaching the empty state requires deleting every program in the shared catalog.
-  test.skip('TC-016: transition from populated list to empty state after deleting last program — the catalog is not limited to one program', async () => {});
 
   test('TC-017: program list is accessible via keyboard navigation', async ({ page, browserName }) => {
     // Playwright's WebKit build does not move DOM focus when Tab is pressed. The buttons are in the tab order (tabIndex 0).

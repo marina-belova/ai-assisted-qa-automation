@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { ProgramsPage } from '../pages/ProgramsPage';
+import { expectNoAxeViolations } from '../utils/a11y';
 
 test.describe('Programs accessibility', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,7 +13,7 @@ test.describe('Programs accessibility', () => {
   test('Programs page has no axe violations', { tag: '@regression' }, async ({ page }) => {
     const results = await new AxeBuilder({ page }).analyze();
 
-    expect(results.violations).toEqual([]);
+    await expectNoAxeViolations(results.violations);
   });
 
   test('New Program modal has no axe violations within dialog scope', async ({ page }) => {
@@ -26,6 +27,6 @@ test.describe('Programs accessibility', () => {
       .disableRules(['page-has-heading-one'])
       .analyze();
 
-    expect(results.violations).toEqual([]);
+    await expectNoAxeViolations(results.violations);
   });
 });

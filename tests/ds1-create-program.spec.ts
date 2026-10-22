@@ -91,10 +91,6 @@ test.describe('Negative flows', () => {
     await expect(modal.dialog).toBeHidden({ timeout: 15_000 });
     await expect(programs.programNameText(name)).toHaveCount(0);
   });
-
-  test.skip('TC-008: non-admin user cannot access program creation form', async () => {});
-
-  test.skip('TC-009: duplicate program name is rejected on creation', async () => {});
 });
 
 test.describe('Edge cases', () => {
@@ -110,8 +106,6 @@ test.describe('Edge cases', () => {
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
   });
-
-  test.skip('TC-011: program name exceeding maximum length is rejected', async () => {});
 
   test('TC-012: program name with special characters is accepted', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);

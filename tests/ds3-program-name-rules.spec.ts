@@ -112,12 +112,6 @@ test.describe('Negative flows', () => {
     expect(posted).toBe(false);
   });
 
-  // The create API accepts a repeated name and does not show an error.
-  test.skip('TC-007: duplicate program name is rejected on creation — create accepts a repeated name and shows no error', async () => {});
-
-  // The edit API accepts a repeated name and does not show an error.
-  test.skip('TC-008: duplicate program name is rejected on edit — edit accepts an existing name and shows no error', async () => {});
-
   test('TC-009: empty program name is rejected', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
@@ -134,18 +128,9 @@ test.describe('Negative flows', () => {
     await expect(modal.dialog).toBeVisible();
     expect(posted).toBe(false);
   });
-
-  // Program Name has no maximum length; a 256-character name is saved and no validation error is shown.
-  test.skip('TC-010: program name exceeding maximum length is rejected — a 256-character name is saved', async () => {});
-
-  // Duplicate checks are not case-insensitive; a different casing is saved as a separate program.
-  test.skip('TC-011: duplicate check is case-insensitive — a different casing is saved and no error is shown', async () => {});
 });
 
 test.describe('Edge cases', () => {
-  // Leading and trailing spaces are trimmed, then the name is saved even when that trimmed name already exists.
-  test.skip('TC-012: duplicate name with different whitespace is rejected — trimmed duplicates are saved', async () => {});
-
   test('TC-013: program name with Unicode characters is accepted', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('プログラミング基礎 2026');
@@ -194,10 +179,4 @@ test.describe('Edge cases', () => {
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
   });
-
-  // Create does not show a duplicate-name error, so there is no error to clear before a corrected save.
-  test.skip('TC-016: duplicate name error persists until name is changed — create shows no duplicate error', async () => {});
-
-  // The name is only trimmed. A tab or newline inside the name is stored as entered.
-  test.skip('TC-017: tab and newline characters in program name are handled correctly — internal control characters are stored', async () => {});
 });

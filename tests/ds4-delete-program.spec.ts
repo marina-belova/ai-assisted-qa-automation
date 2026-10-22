@@ -55,9 +55,6 @@ test.describe('Positive flows', () => {
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
   });
-
-  // The shared catalog has thousands of programs, so a fixture of exactly 3 programs cannot be established.
-  test.skip('TC-004: program list count decreases by one after confirmed deletion — the catalog does not contain exactly 3 programs', async () => {});
 });
 
 test.describe('Negative flows', () => {
@@ -74,24 +71,9 @@ test.describe('Negative flows', () => {
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
   });
-
-  // Delete confirmation is a native window.confirm dialog, which has no page overlay to click.
-  test.skip('TC-006: program is not deleted when confirmation dialog is dismissed by clicking outside — confirmation is a native dialog', async () => {});
-
-  // Only an admin account is configured, so a non-admin session cannot be started.
-  test.skip('TC-007: non-admin user cannot delete programs — only an admin account is configured', async () => {});
-
-  // A failed delete leaves the program in place, but the page does not show an error message.
-  test.skip('TC-008: program is not deleted when API or server error occurs during deletion — no deletion error is shown', async () => {});
-
-  // The confirmation is a native dialog that closes on the first response. There is no in-page Confirm button to double-click.
-  test.skip('TC-009: double-clicking confirm does not cause duplicate deletion errors — confirmation is a native dialog', async () => {});
 });
 
 test.describe('Edge cases', () => {
-  // Showing the empty state requires deleting every program in the shared catalog.
-  test.skip('TC-010: deleting the only program in the system shows empty state — the catalog is not limited to one program', async () => {});
-
   test('TC-011: deleting a program with a long name displays correctly in confirmation dialog', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = nameOfLength(255);
@@ -149,7 +131,4 @@ test.describe('Edge cases', () => {
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
   });
-
-  // The native dialog closes before the request starts, and the page does not disable delete or show a loading state.
-  test.skip('TC-015: delete icon is not visible or is disabled during an in-progress deletion — no in-progress delete state is shown', async () => {});
 });

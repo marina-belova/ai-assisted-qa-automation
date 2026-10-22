@@ -153,8 +153,6 @@ test.describe('Negative flows', () => {
     await expect(programs.textInProgramCell(otherName, 'Other program')).toBeVisible();
   });
 
-  test.skip('TC-009: non-admin user cannot edit programs — only an admin account is configured', async () => {});
-
   test('TC-010: no update occurs when save is clicked without any changes', async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Web Development 2026');
@@ -254,6 +252,4 @@ test.describe('Edge cases', () => {
     await expect(programs.textInProgramCell(name, description)).toHaveCount(0);
     await expect(programs.programCellDescriptionParagraph(name)).toHaveCount(1);
   });
-
-  test.skip('TC-016: concurrent edit by two admins shows appropriate conflict handling — only one admin account is configured', async () => {});
 });

@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
 import AxeBuilder from '@axe-core/playwright';
 import { ProgramsPage } from '../pages/ProgramsPage';
+import { expectNoAxeViolations } from '../utils/a11y';
 import { uniqueName } from '../utils/test-data';
 
 test.describe.configure({ mode: 'default', timeout: 180_000 });
@@ -36,6 +37,6 @@ test.describe('Programs Edit Program modal accessibility', () => {
       .disableRules(['page-has-heading-one'])
       .analyze();
 
-    expect(results.violations).toEqual([]);
+    await expectNoAxeViolations(results.violations);
   });
 });

@@ -4,7 +4,8 @@ test('has title', async ({ page }) => {
   await page.goto('https://playwright.dev/');
 
   // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Playwright/);
+  // Temporary intentional failure for CI Failure Triage homework.
+  await expect(page).toHaveTitle(/Not the Playwright site title/);
 });
 
 test('get started link', async ({ page }) => {

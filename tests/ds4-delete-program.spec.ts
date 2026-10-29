@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import { ProgramsPage } from '../pages/ProgramsPage';
-import { deleteProgramConfirmationMessage } from '../pages/program-api';
+import { deleteProgramConfirmationMessage, isProgramsResponse } from '../pages/program-api';
 import { nameOfLength, uniqueName } from '../utils/test-data';
 
 // Override fullyParallel so this file's tests stay isolated under API load.
@@ -26,11 +26,18 @@ test.describe('Positive flows', () => {
     await expect(programs.programNameText(name)).toHaveCount(0, { timeout: 45_000 });
   });
 
-  test('TC-002: program deletion is cancelled and program remains in the list', async ({ page }) => {
+  test('TC-002: program deletion is cancelled and program remains in the list', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Test Program');
     const description = 'Program that should remain';
+    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await programs.createProgram(name, description);
+    const body = (await (await created).json()) as { data?: { id?: string } };
+    const uuid = body.data?.id;
+    if (!uuid) {
+      throw new Error('Create program response did not include data.id');
+    }
+    trackProgram(uuid);
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -42,10 +49,17 @@ test.describe('Positive flows', () => {
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
   });
 
-  test('TC-003: confirmation dialog displays the correct program name', async ({ page }) => {
+  test('TC-003: confirmation dialog displays the correct program name', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
+    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await programs.createProgram(name, 'Full-stack web development program');
+    const body = (await (await created).json()) as { data?: { id?: string } };
+    const uuid = body.data?.id;
+    if (!uuid) {
+      throw new Error('Create program response did not include data.id');
+    }
+    trackProgram(uuid);
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -58,10 +72,17 @@ test.describe('Positive flows', () => {
 });
 
 test.describe('Negative flows', () => {
-  test('TC-005: program is not deleted when confirmation dialog is dismissed via Escape', async ({ page }) => {
+  test('TC-005: program is not deleted when confirmation dialog is dismissed via Escape', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Test Program');
+    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await programs.createProgram(name, 'Program that should survive Escape');
+    const body = (await (await created).json()) as { data?: { id?: string } };
+    const uuid = body.data?.id;
+    if (!uuid) {
+      throw new Error('Create program response did not include data.id');
+    }
+    trackProgram(uuid);
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -74,10 +95,17 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-011: deleting a program with a long name displays correctly in confirmation dialog', async ({ page }) => {
+  test('TC-011: deleting a program with a long name displays correctly in confirmation dialog', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = nameOfLength(255);
+    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await programs.createProgram(name, 'Long name deletion');
+    const body = (await (await created).json()) as { data?: { id?: string } };
+    const uuid = body.data?.id;
+    if (!uuid) {
+      throw new Error('Create program response did not include data.id');
+    }
+    trackProgram(uuid);
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -117,7 +145,7 @@ test.describe('Edge cases', () => {
     await expect(programs.programNameText(name)).toHaveCount(0, { timeout: 45_000 });
   });
 
-  test('TC-014: deleted program name becomes available for reuse', async ({ page }) => {
+  test('TC-014: deleted program name becomes available for reuse', async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Test Program');
     await programs.createProgram(name, 'Name to reuse');
@@ -126,7 +154,14 @@ test.describe('Edge cases', () => {
     await programs.confirmDeleteProgram(name);
     await expect(programs.programNameText(name)).toHaveCount(0, { timeout: 45_000 });
 
+    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await programs.createProgram(name, 'Recreated program');
+    const body = (await (await created).json()) as { data?: { id?: string } };
+    const uuid = body.data?.id;
+    if (!uuid) {
+      throw new Error('Create program response did not include data.id');
+    }
+    trackProgram(uuid);
 
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();

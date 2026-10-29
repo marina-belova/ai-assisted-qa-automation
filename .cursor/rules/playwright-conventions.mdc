@@ -1,0 +1,27 @@
+---
+description: How this project writes Playwright tests - auth, POM, locators, cleanup, data.
+globs: tests/**
+alwaysApply: false
+---
+
+# Playwright Conventions
+
+## Auth
+Stored session by default; UI login only for login-page tests.
+
+`tests/auth.setup.ts` signs in once and writes `playwright/.auth/user.json`. Chromium uses that file through `storageState` in `playwright.config.ts`. Do not repeat UI login in program specs. Login-page tests start with an empty `storageState`. UI login belongs in `pages/LoginPage.ts` for setup and login-page tests only. Do not commit `.env` or `playwright/.auth/`.
+
+## Page Objects
+One POM per page/component; locators in the constructor; no assertions in POMs; tests describe intent.
+
+Follow `.cursor/skills/pom-conventions/SKILL.md`. Reuse `pages/LoginPage.ts`, `pages/ProgramsPage.ts`, `pages/NewProgramModal.ts`, `pages/EditProgramModal.ts`, `pages/dialog-sync.ts`, and `pages/program-api.ts` before adding locators or actions.
+
+## Locators
+Role/label-based; avoid CSS selectors and brittle text.
+
+Prefer `getByRole` and `getByLabel`. The POM skill also allows `getByText`. No CSS or XPath in `pages/`. Do not invent selectors.
+
+## Data & cleanup
+Unique data using Date.now(); every test cleans up after itself.
+
+Use `utils/test-data.ts`: `uniqueName`, `uniqueNameSimple`, and `nameOfLength` (each appends `Date.now()`). When a test creates a program, follow `.cursor/skills/api-cleanup/SKILL.md`: import `test` from `fixtures/cleanup.fixture.ts` and call `trackProgram(uuid)`. The fixture deletes only tracked ids. Do not add a manual cleanup `afterAll`, and do not delete data the test did not create.

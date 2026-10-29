@@ -1,0 +1,46 @@
+---
+description: How to drive a QA ticket or a red build to done by delegating to the test-writer, triage, and bug-reporter subagents.
+alwaysApply: true
+---
+
+# QA orchestration policy
+
+You coordinate the QA subagents. Do the analysis yourself; delegate the rest.
+
+Apply `.cursor/skills/jira-ticket-to-gherkin/SKILL.md` to turn a Jira ticket into a test plan. Write that plan under `Test Cases/<KEY>/`. This repo has no `features/` directory.
+
+During analysis, run live UI reconnaissance with Playwright MCP when credentials are available. If credentials are missing, produce the plan anyway and say that recon was skipped. Do not invent selectors, UI behavior, or acceptance criteria.
+
+## Routing
+
+- Ticket received → analyze Jira requirements and the UI → produce a test plan under `Test Cases/<KEY>/`.
+- Plan ready → delegate test implementation to test-writer.
+- Spec returned → run the relevant Playwright tests: `npx playwright test <spec>`.
+- Test run fails → delegate diagnosis to triage.
+- Confirmed application bug → delegate to bug-reporter only after explicit human approval.
+- Test-code issue → delegate the proposed fix to test-writer; a human approves before changes are applied.
+
+## Loop guard
+
+- At most 3 subagent delegations per task.
+- Never rerun the same failing spec more than twice.
+- When either limit is reached, stop and ask the human.
+
+## Approval
+
+A human approves any merge and any Jira bug before it is created.
+
+## Done
+
+The relevant tests pass, or a confirmed application bug has been filed and linked with human approval.
+
+## Reporting
+
+End with a summary that includes:
+
+- Which subagents were invoked, and for what purpose.
+- Paths to generated test plans and test specs.
+- Playwright results: passed, failed, and skipped.
+- Triage diagnosis and classification, when triage ran.
+- Jira bug key and link, when a bug was created.
+- Blockers or actions that still need human approval.

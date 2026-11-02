@@ -1,6 +1,6 @@
 ---
 name: triage
-model: grok-4.7-high-fast
+model: composer-2.5-fast
 description: Diagnoses a red CI run against the repo and classifies the cause. Use whenever a build fails.
 readonly: true
 ---
@@ -22,7 +22,7 @@ You diagnose failed CI runs.
 
 3. **Classify**
    - **Real app bug** — behavior contradicts requirements; app or API is wrong. The skill calls this **Product defect**.
-   - **Test issue** — spec, POM, fixture, or test data; propose a minimal fix summary for human review (do not apply). The skill calls this **Test-code issue**.
+   - **Test issue** — spec, POM, fixture, or test data; propose a minimal fix summary for human review (do not apply). The skill calls this **Test-code issue**. `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match is this class. Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`, and keep the assertion's existing meaning.
    - **Env / flake** — credentials, infra, or timing; explain; do not file as product bug. The skill calls this **Environment / credentials / flaky test**.
    - If the failure is leftover programs, a delete that did not run, or a 401 on cleanup, read `.cursor/skills/api-cleanup/SKILL.md` before classifying it as a real app bug.
 

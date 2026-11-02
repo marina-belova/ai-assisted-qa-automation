@@ -25,10 +25,17 @@ Do **not** duplicate page-level actions (login, open create form, submit create/
 ## POM rules
 
 1. **Locators** — `readonly` properties on the class, set in the constructor.
-2. **Locator APIs** — Only `getByRole`, `getByLabel`, and `getByText` in Page Objects. No CSS or XPath locators in `pages/`.
+2. **Locator APIs** — In this order: `getByRole`, then `getByLabel` or `getByPlaceholder`, then `getByText`. `getByTestId` only as a last resort. Avoid CSS and XPath where possible.
 3. **Actions** — Methods perform user actions (`goto`, `openNewProgramForm`, `createProgram`, `openEditProgram`, `submitEdit`, etc.).
 4. **Assertions** — Never `expect()` inside Page Objects. Specs assert using locators from Page Objects (e.g. `programs.programNameText(name)`, `programs.textInProgramCell(name, description)`).
-5. **Specs** — No inline `page.getByRole` / `getByLabel` / `getByText` for flows that belong on a Page Object.
+5. **Specs** — No inline locators for flows that belong on a Page Object.
+
+## Flake prevention
+
+- Do not use `waitForTimeout`. Assert with retrying web-first checks: `toBeVisible()`, `toBeEnabled()`, and `toHaveText()`.
+- Do not write `expect(await locator.isVisible()).toBe(true)`.
+- When a locator matches multiple elements, use `filter({ hasText: ... })` instead of `.first()`.
+- Replacing a wait or a locator must keep the assertion's existing meaning.
 
 ## Authentication
 

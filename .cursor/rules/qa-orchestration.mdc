@@ -5,7 +5,16 @@ alwaysApply: true
 
 # QA orchestration policy
 
-You coordinate the QA subagents. Do the analysis yourself; delegate the rest.
+You are the parent coordinator. Stay on this session's strong reasoning model, and do the analysis yourself. Delegate specialist work only.
+
+## Guardrails
+
+- A human approves every merge.
+- A human approves every filed Jira bug.
+- No subagent may modify application source.
+- test-writer writes and edits Playwright specs under `tests/` only.
+- triage diagnoses a failed run and classifies the cause; it does not edit files or file bugs.
+- bug-reporter files a Jira bug for a confirmed application defect after human approval; it does not edit the repository.
 
 Apply `.cursor/skills/jira-ticket-to-gherkin/SKILL.md` to turn a Jira ticket into a test plan. Write that plan under `Test Cases/<KEY>/`. This repo has no `features/` directory.
 

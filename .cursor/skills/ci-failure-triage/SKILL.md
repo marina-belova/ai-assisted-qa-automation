@@ -77,7 +77,7 @@ This job uploads `playwright-report/` only, not `test-results/`. Evidence in the
 
 Unzip a trace under `/tmp/ci-triage/<run-id>/` when the markdown snapshot is not enough to see the DOM, network, or console. If no zip is present, report that no trace was attached.
 
-Accessibility scans call `expectNoAxeViolations` in `utils/a11y.ts`. In CI that helper records violations and does **not** fail the test. An a11y warning in a green or unrelated failed log is not the job failure. Locally the same helper still fails on violations.
+A Programs accessibility scan must fail when `results.violations` is not empty. `expect(results.violations).toEqual([])` is the required assertion. `expectNoAxeViolations` in `utils/a11y.ts` records violations and lets the test pass when `CI` is set. A green CI job that only warns about axe violations is not an accessibility pass. Report each rule id, impact, and node, then stop. Do not treat that warning as noise, and do not file a Jira bug unless the user approves.
 
 ## Cross-reference
 
@@ -89,7 +89,7 @@ Read the current spec at the stack line, then the code it calls.
 | `pages/ProgramsPage.ts`, `pages/NewProgramModal.ts`, `pages/EditProgramModal.ts`, `pages/LoginPage.ts`, `pages/program-api.ts`, `pages/dialog-sync.ts` | Locators and actions. Apply [pom-conventions](../pom-conventions/SKILL.md): assertions stay in specs; POMs use role/label/text locators |
 | `fixtures/cleanup.fixture.ts`, `utils/test-data.ts`, `utils/a11y.ts` | Cleanup, generated names, a11y reporting |
 | `Test Cases/<KEY>/` | Acceptance criteria when the spec maps to a DS story |
-| `playwright.config.ts` | `baseURL` from `DIDAXIS_URL`, Chromium `storageState`, retries, trace |
+| `playwright.config.ts` | `baseURL` from `DIDAXIS_URL`, `locale: 'en-US'`, `timezoneId: 'America/Los_Angeles'`, Chromium `storageState`, `retries` 2 on CI and 0 locally, `trace: 'on-first-retry'`. `workers` is not set to 1. |
 
 Didaxis application source is not in this repository. Do not invent an application file or line. Cite the test or Page Object line that observed the behavior, plus the DOM evidence from the report. If application source is present in the workspace, cite that file and line too.
 
@@ -102,7 +102,7 @@ Pick one primary class. State why in one short paragraph.
 | Class | Signals | Next step |
 |-------|---------|-----------|
 | **Product defect** | The app contradicts the spec or `Test Cases/` AC. The page loaded, auth worked, and the same assertion failed across retries. DOM or network evidence shows the wrong UI or API result. | Recommend a product fix. Draft what a Jira Bug would say. File it with [jira-bug-reporter](../jira-bug-reporter/SKILL.md) only after the user approves. |
-| **Test-code issue** | Wrong expected value, stale locator, assertion in the wrong place, or the test does not match current POM behavior. The page did load the correct behavior. | Recommend a minimal spec or POM edit. Do not edit files unless the user asks. |
+| **Test-code issue** | Wrong expected value, stale locator, assertion in the wrong place, or the test does not match current POM behavior. The page did load the correct behavior. Also `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match. | Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`. Keep the assertion's existing meaning. Do not edit files unless the user asks. |
 | **Environment / credentials / flaky test** | `setup` cannot authenticate, secrets missing, target URL unreachable, browser install failed, or the test passed on a later retry with no code change. Shared-catalog collisions and cleanup 401s belong here when the assertion never saw a product bug. | Name the failed step and the env var **name** only. Do not file a product bug. |
 
 Checkout, `npm ci`, and `npx playwright install --with-deps chromium` succeeding means the red step is the Playwright command, not the runner image.

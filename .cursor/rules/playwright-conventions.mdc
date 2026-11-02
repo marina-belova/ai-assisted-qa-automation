@@ -1,27 +1,212 @@
 ---
-description: How this project writes Playwright tests - auth, POM, locators, cleanup, data.
+description: How this project writes Playwright tests — auth, POM, locators, cleanup, data.
 globs: tests/**
 alwaysApply: false
 ---
 
 # Playwright Conventions
 
-## Auth
-Stored session by default; UI login only for login-page tests.
+`playwright.config.ts` sets `fullyParallel: true`, `retries: process.env.CI ? 2 : 0`, `baseURL: process.env.DIDAXIS_URL`, `locale: 'en-US'`, `timezoneId: 'America/Los_Angeles'`, and `trace: 'on-first-retry'`. Do not set `workers: 1` or raise retries above 2. The `setup` project and `storageState` dependency stay in place.
 
-`tests/auth.setup.ts` signs in once and writes `playwright/.auth/user.json`. Chromium uses that file through `storageState` in `playwright.config.ts`. Do not repeat UI login in program specs. Login-page tests start with an empty `storageState`. UI login belongs in `pages/LoginPage.ts` for setup and login-page tests only. Do not commit `.env` or `playwright/.auth/`.
+Examples marked **Not in the repo yet** are the required pattern. Do not treat their expected strings as observed Didaxis copy.
 
-## Page Objects
-One POM per page/component; locators in the constructor; no assertions in POMs; tests describe intent.
+## 1. Locators
 
-Follow `.cursor/skills/pom-conventions/SKILL.md`. Reuse `pages/LoginPage.ts`, `pages/ProgramsPage.ts`, `pages/NewProgramModal.ts`, `pages/EditProgramModal.ts`, `pages/dialog-sync.ts`, and `pages/program-api.ts` before adding locators or actions.
+**Standard.** Use locators in this order: `getByRole`, then `getByLabel` or `getByPlaceholder`, then `getByText`. Use `getByTestId` only as a last resort. Avoid CSS and XPath where possible. When a locator matches multiple elements, use `filter({ hasText })` instead of `.first()`. Specs do not inline a locator for a flow that belongs on a Page Object.
 
-## Locators
-Role/label-based; avoid CSS selectors and brittle text.
+**GOOD.** In the repo, `pages/LoginPage.ts`:
 
-Prefer `getByRole` and `getByLabel`. The POM skill also allows `getByText`. No CSS or XPath in `pages/`. Do not invent selectors.
+```ts
+this.emailField = page.getByLabel('Email');
+this.signInButton = page.getByRole('button', { name: 'Sign In' });
+```
 
-## Data & cleanup
-Unique data using Date.now(); every test cleans up after itself.
+`pages/ProgramsPage.ts` disambiguates with `filter({ has })`. `tests/todoMVC.spec.ts` uses `filter({ hasText })`.
 
-Use `utils/test-data.ts`: `uniqueName`, `uniqueNameSimple`, and `nameOfLength` (each appends `Date.now()`). When a test creates a program, follow `.cursor/skills/api-cleanup/SKILL.md`: import `test` from `fixtures/cleanup.fixture.ts` and call `trackProgram(uuid)`. The fixture deletes only tracked ids. Do not add a manual cleanup `afterAll`, and do not delete data the test did not create.
+**BAD.** In the repo, `tests/programs.a11y.spec.ts` scopes axe with the CSS selector `section[role="dialog"][aria-modal="true"]`. `.first()` is not in the repo yet. Do not add it.
+
+**Prevents.** A locator that breaks when layout or copy shifts, or that clicks the wrong match when several elements share a role.
+
+## 2. Waiting
+
+**Standard.** Do not use `waitForTimeout` or a fixed `setTimeout`. Wait with retrying assertions: `toBeVisible()`, `toBeEnabled()`, and `toHaveText()`. For a relative timestamp, call `page.clock.install()` before navigation, then `pauseAt` after the page has loaded. Do not build the expected label with `Date.now()`.
+
+**GOOD.** In the repo, program specs wait with `await expect(programs.newProgramButton).toBeVisible()`.
+
+**Not in the repo yet.** Freeze time, then assert the relative label for that instant:
+
+```ts
+await page.clock.install({ time: new Date('2026-03-01T11:55:00-08:00') });
+await page.goto('/programs');
+await page.clock.pauseAt(new Date('2026-03-01T12:00:00-08:00'));
+await expect(page.getByText('5 minutes ago')).toBeVisible();
+```
+
+`'5 minutes ago'` is the example for an event at 11:55 frozen at 12:00. Confirm the product's label with Playwright MCP before using it in a spec. `page.clock` does not change `Date.now()` in the test process, so it does not freeze `uniqueName()`.
+
+**BAD.** `waitForTimeout` is not in the repo. `pages/ProgramsPage.ts` uses `setTimeout` while waiting for the native delete dialog. That fixed delay can pass or fail with timing.
+
+**Prevents.** A sleep that is too short on a slow response and too long on a fast one.
+
+## 3. Page Objects
+
+**Standard.** One Page Object per page or component. Locators are `readonly` and set in the constructor. Methods perform actions. Never call `expect()` inside a Page Object. The spec asserts with the Page Object's locators. Reuse `pages/LoginPage.ts`, `pages/ProgramsPage.ts`, `pages/NewProgramModal.ts`, `pages/EditProgramModal.ts`, `pages/dialog-sync.ts`, and `pages/program-api.ts` before adding a locator or action. Do not duplicate login, open-create, submit, or delete in a spec.
+
+**GOOD.** In the repo, `pages/EditProgramModal.ts`:
+
+```ts
+this.dialog = page.getByRole('dialog', { name: 'Edit Program' });
+this.saveButton = this.dialog.getByRole('button', { name: 'Save' });
+await this.saveButton.click();
+```
+
+**BAD.** In the repo, `tests/example.spec.ts` and `tests/todoMVC.spec.ts` call `page.getByRole` and `page.getByPlaceholder` in the spec instead of a Page Object.
+
+**Prevents.** The same locator being copied into many specs, and an assertion hidden inside a helper so the failure is hard to trace.
+
+## 4. Auth
+
+**Standard.** Use a stored session except when the test is the login page. Login-page tests start with an empty `storageState`, open `/login`, sign in through `pages/LoginPage.ts`, and verify success. Every other test reuses `playwright/.auth/user.json`. The `setup` project runs `tests/auth.setup.ts`, which logs in through the UI once. Do not log in again in each test. Credentials and `DIDAXIS_URL` come from the environment. Do not commit `.env` or `playwright/.auth/`.
+
+**GOOD.** In the repo, `playwright.config.ts`:
+
+```ts
+{ name: 'chromium', use: { storageState: authFile }, dependencies: ['setup'] }
+```
+
+**BAD.** Not in the repo yet: a feature spec that fills Email and Password on every test. Also in the repo, `tests/auth.setup.ts` opens `https://test.didaxis.studio/login` instead of `baseURL`, so setup ignores `DIDAXIS_URL`.
+
+**Prevents.** A full UI login on every test, which is slow and fails when the login form is not the behavior under test. A login test that loads `user.json` never actually tests login.
+
+## 5. Test Data
+
+**Standard.** Build names with `uniqueName`, `uniqueNameSimple`, or `nameOfLength` from `utils/test-data.ts`. Each appends `Date.now()`. When a test creates a program, import `test` from `fixtures/cleanup.fixture.ts` and call `trackProgram(uuid)` as soon as `data.id` is known. The fixture deletes only those ids. Do not add a cleanup `afterAll`. Do not delete a program the test did not create. Bulk cleanup requires explicit human approval and is not part of a spec run.
+
+**GOOD.** In the repo, `tests/ds1-create-program.spec.ts`:
+
+```ts
+import { test, expect } from '../fixtures/cleanup.fixture';
+const name = uniqueName('Web Development 2026');
+trackProgram(await modal.submitCreateWithReload());
+```
+
+**BAD.** In the repo, `tests/ds2-create-program.spec.ts`, `tests/ds2-edit-program-regression.spec.ts`, and `tests/ds3-program-name-rules.spec.ts` call `createProgram` and do not track the id.
+
+**Prevents.** Leftover programs that collide with later tests and make the shared catalog slower and less deterministic.
+
+## 6. API Testing
+
+**Standard.** Use Playwright's API request context for programmatic setup and cleanup. `POST /api/auth/login` returns `{ data: { access_token } }`. Send it as `Authorization: Bearer`. Never hardcode or print the token. Cleanup is `DELETE /api/programs/<uuid>`. On 401, refresh the token once and retry that delete. Assert the response status. Do not drive the UI to prove an API contract. The access token is not in `localStorage`, `sessionStorage`, or `document.cookie`.
+
+**GOOD.** In the repo, `fixtures/didaxis-auth.ts` sends the Bearer token on the request context, then deletes only that id:
+
+```ts
+const api = await request.newContext({
+  extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+});
+await api.delete(`/api/programs/${id}`);
+```
+
+`fixtures/cleanup.fixture.ts` retries that delete once when the status is 401.
+
+**BAD.** Not in the repo yet: a cleanup that clicks Delete in the UI, or a token written into source. Do not add either.
+
+**Prevents.** A cleanup path that depends on the same UI the test may have broken, and a 401 that leaves the program behind after the access token expires.
+
+## 7. Network Mocking
+
+**Standard.** Mock with `page.route()` and `route.fulfill()`. Abort a timeout with `route.abort('timedout')`. Intercept only the Programs request under test. Use `pages/ProgramsPage.ts` and `pages/EditProgramModal.ts`. Do not edit application source. Each test has exactly one tag. Inspect the mocked UI with Playwright MCP before asserting. Assert only text and exceptions recorded in `.cursor/skills/network-mocking/SKILL.md`. Do not invent an error message.
+
+Observed on `https://test.didaxis.studio`, with an empty JSON body and no mock message:
+
+- Save `PATCH` 503: the Edit Program dialog stays open, no new text, and the page throws `Request failed with status code 503`.
+- `GET /api/programs` 200 with `{ "data": [] }`: the page shows `No programs yet. Create your first program to get started.`
+- `GET /api/programs` 200 with `{ "data": { "id": "not-a-list" } }`: the page throws `t.map is not a function` and the main region is empty. The app crashes. Do not assert that it stays up.
+
+**GOOD.** In the repo, `tests/ds5-program-list.spec.ts` mocks create, not Save. It fulfills only `POST` and continues every other method:
+
+```ts
+await page.route('**/api/programs', async (route) => {
+  if (route.request().method() === 'POST') {
+    await route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"error"}' });
+    return;
+  }
+  await route.continue();
+});
+```
+
+**BAD.** Not in the repo yet: asserting a visible "Service Unavailable" sentence for Save 503. None was shown. A raw body `[]` is also wrong for the empty state. It throws `Cannot read properties of undefined (reading 'length')`.
+
+**Prevents.** A test that fails because the real service is down or the catalog is empty, and an assertion written for a message the product does not render.
+
+## 8. Accessibility
+
+**Standard.** Scan the Programs page with `new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()` and `expect(results.violations).toEqual([])`. `wcag2a` and `wcag2aa` are WCAG 2.0 A and AA. Do not call `disableRules()`. Do not call `expectNoAxeViolations` in `utils/a11y.ts`. That helper lets the test pass when `CI` is set. Use `.include()` or `.exclude()` only to omit a noisy third-party widget, with a comment that names the widget. Use `ProgramsPage` and role locators. Each test has exactly one tag. If violations are not empty, report each rule id, impact, help, and nodes, then stop. Do not file a Jira bug unless a human approves it.
+
+Keyboard: Tab until `programs.newProgramButton` (`+ New Program`) is focused. Do not call `focus()` to skip Tab. Assert `toBeFocused()`, press Enter with `programs.pressKey('Enter')`, and assert `new NewProgramModal(page).dialog` is visible. Do not call `openNewProgramForm()` for this test. That method clicks.
+
+A Playwright MCP scan with those tags found one serious violation: `color-contrast` on 863 nodes. Report it and stop. Do not hide it.
+
+**GOOD.** Not in the repo yet. The required scan is:
+
+```ts
+const results = await new AxeBuilder({ page })
+  .withTags(['wcag2a', 'wcag2aa'])
+  .analyze();
+expect(results.violations).toEqual([]);
+```
+
+**BAD.** In the repo, `tests/programs.a11y.spec.ts` calls `.analyze()` with no WCAG tags, uses `expectNoAxeViolations`, and calls `.disableRules(['page-has-heading-one'])`.
+
+**Prevents.** A green CI run that still has accessibility violations, and a rule disabled so the violation is never fixed.
+
+## 9. Assertions
+
+**Standard.** Assert with retrying locator matchers: `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, `toBeFocused()`, and `toEqual([])` for axe violations. Do not write `expect(await locator.isVisible()).toBe(true)` or the same one-shot check of `textContent()`, `innerHTML()`, or a computed style. When replacing a wait or a locator, keep what the assertion verifies. For an API test, assert the response status.
+
+**GOOD.** In the repo, `tests/ds5-program-list.spec.ts`:
+
+```ts
+await expect(programs.newProgramButton).toBeVisible();
+await expect(descriptionText).toHaveText(description);
+```
+
+**BAD.** In the repo, `tests/todoMVC.spec.ts` uses `expect(await title.textContent()).toBe('Buy milk')`. `tests/ds5-program-list.spec.ts` uses `expect(await edit.evaluate(...outlineStyle)).toBe('solid')`.
+
+**Prevents.** A one-shot read that fails because the element was not ready yet, and a retrying matcher that no longer checks the original outcome.
+
+## 10. Anti-flake
+
+**Standard.** Follow sections 1, 2, and 9. Do not use `.first()` on a multi-match. Do not set `workers: 1` in `playwright.config.ts` or raise retries above 2. Do not override `fullyParallel` with `mode: 'default'` in new specs. Keep one tag per scenario test. `page.clock` freezes page time only. It does not make `uniqueName()` deterministic.
+
+**GOOD.** In the repo, `pages/ProgramsPage.ts`:
+
+```ts
+return this.page.getByRole('row').filter({ has: this.editProgramButton(name) });
+```
+
+**BAD.** In the repo, `tests/ds2-create-program.spec.ts`, `tests/ds3-program-name-rules.spec.ts`, `tests/ds4-delete-program.spec.ts`, `tests/ds5-program-list.spec.ts`, and `tests/programs-edit-modal.a11y.spec.ts` set `test.describe.configure({ mode: 'default' })`, which runs that file serially. `.first()` is not in the repo yet. Do not add it.
+
+**Prevents.** A pass that depends on which parallel worker won, which duplicate element `.first()` picked, or how long a fixed sleep waited.
+
+## Do / Don't
+
+| Do | Don't |
+|---|---|
+| `getByRole`, then `getByLabel` or `getByPlaceholder`, then `getByText` | CSS, XPath, or `getByTestId` before the earlier options |
+| `filter({ hasText })` when several elements match | `.first()` on a multi-match |
+| `toBeVisible()`, `toBeEnabled()`, `toHaveText()` | `waitForTimeout`, `setTimeout`, or `expect(await locator.isVisible()).toBe(true)` |
+| `page.clock.install()` then `pauseAt` for a relative timestamp | `Date.now()` as the expected relative label |
+| Locators in the Page Object constructor; assertions in the spec | `expect()` inside `pages/` |
+| Stored `playwright/.auth/user.json` for feature tests | UI login in every feature test |
+| Empty `storageState` and `/login` for a login-page test | A login test that loads `user.json` |
+| `uniqueName` and `trackProgram` for a program the test created | A create test with no cleanup, or a delete of data the test did not create |
+| Bulk cleanup only after explicit human approval | A spec that deletes the catalog |
+| Bearer token from `POST /api/auth/login` for API cleanup | A hardcoded token, or UI clicks to prove an API contract |
+| `page.route()` and `route.fulfill()` on the one Programs request under test | A mock of an unrelated endpoint, or an invented error sentence |
+| `withTags(['wcag2a', 'wcag2aa'])` and `expect(results.violations).toEqual([])` | `disableRules()`, or `expectNoAxeViolations` in CI |
+| `include()` / `exclude()` only for a named third-party widget | A CSS include that hides the Programs dialog |
+| Tab to `+ New Program`, assert focus, press Enter, assert the dialog | `focus()` to skip Tab, or `openNewProgramForm()` in that keyboard test |
+| One tag that names the scenario | A second tag on the same test |
+| Report axe violations and stop | A weaker assertion so the run stays green |
+| `retries` 2 on CI and 0 locally, no `workers: 1` | Retries above 2, or `mode: 'default'` on a new spec |

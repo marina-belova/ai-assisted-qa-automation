@@ -10,7 +10,8 @@ test.describe('Programs accessibility', () => {
     await expect(programs.newProgramButton).toBeVisible({ timeout: 30_000 });
   });
 
-  test('Programs page has no axe violations', { tag: '@regression' }, async ({ page }) => {
+  // The programs catalog is large enough that a full-page axe scan exceeds the 30s default.
+  test('Programs page has no axe violations', { tag: '@regression', timeout: 120_000 }, async ({ page }) => {
     const results = await new AxeBuilder({ page }).analyze();
 
     await expectNoAxeViolations(results.violations);

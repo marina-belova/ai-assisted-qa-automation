@@ -1,0 +1,110 @@
+# Draft. The weekday 06:00 UTC schedule is written below and left commented
+# out, so GitHub will not run it. A manual run stops before the agent until
+# CURSOR_API_KEY, ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL
+# are set as repository secrets.
+
+name: Test generation
+
+on:
+  # schedule:
+  #   # 06:00 UTC, Monday–Friday. Leave commented until the secrets above exist.
+  #   - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: test-generation
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      DIDAXIS_URL: ${{ secrets.DIDAXIS_URL }}
+      DIDAXIS_EMAIL: ${{ secrets.DIDAXIS_EMAIL }}
+      DIDAXIS_PASSWORD: ${{ secrets.DIDAXIS_PASSWORD }}
+      DIDAXIS_API_TOKEN: ${{ secrets.DIDAXIS_API_TOKEN }}
+    steps:
+      - name: Require backlog credentials
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+          ATLASSIAN_BASE_URL: ${{ secrets.ATLASSIAN_BASE_URL }}
+          DIDAXIS_URL: ${{ secrets.DIDAXIS_URL }}
+          DIDAXIS_EMAIL: ${{ secrets.DIDAXIS_EMAIL }}
+          DIDAXIS_PASSWORD: ${{ secrets.DIDAXIS_PASSWORD }}
+        run: |
+          missing=0
+          for name in CURSOR_API_KEY ATLASSIAN_EMAIL ATLASSIAN_API_TOKEN ATLASSIAN_BASE_URL DIDAXIS_URL DIDAXIS_EMAIL DIDAXIS_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub secret ${name}."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "This workflow is a draft. It will not install the Cursor CLI, call Jira, or run Backlog Mode until every secret above is set. The weekday schedule stays commented out."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Work the In Progress backlog
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+          ATLASSIAN_BASE_URL: ${{ secrets.ATLASSIAN_BASE_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          agent -p --force --trust --output-format text "$(cat <<'EOF'
+          Backlog mode. This workflow is the external trigger. Follow .cursor/rules/qa-orchestration.mdc.
+
+          Queue, lowest key first, at most 5 tickets:
+          project = DS AND status = "In Progress" AND (labels is EMPTY OR labels != "tests-generated") ORDER BY key ASC
+
+          Jira MCP is not available on this runner. Read and update Jira with the REST API using ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL. Use GH_TOKEN for git push and gh pr create. Do not print any secret.
+
+          For each ticket:
+          1. Analyze it with jira-ticket-to-gherkin and write the plan under Test Cases/<KEY>/.
+          2. Delegate the spec to test-writer. Specs stay under tests/. Do not modify application source.
+          3. Run that spec with npx playwright test.
+          4. On a failure, delegate diagnosis to triage. A repeated identical failure stops that ticket. Leave its pull request unmerged.
+          5. Open one pull request for that ticket. Put the DS key in the title and body.
+          6. Add the tests-generated label only after that pull request is successfully opened.
+
+          Never merge a pull request. Never push to main. Never close or transition the ticket. File a Jira bug only after explicit human approval.
+          EOF
+          )"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

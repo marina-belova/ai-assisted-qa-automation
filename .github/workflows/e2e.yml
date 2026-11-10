@@ -28,7 +28,13 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
-      - run: npx playwright test --project=chromium
+      - name: Run the controlled drift test
+        if: ${{ github.head_ref == 'feature/block14-controlled-locator-drift' || github.ref_name == 'feature/block14-controlled-locator-drift' }}
+        run: npx playwright test tests/ds1-create-program.spec.ts -g "TC-001:" --project=chromium --retries=0
+
+      - name: Run the full suite
+        if: ${{ github.head_ref != 'feature/block14-controlled-locator-drift' && github.ref_name != 'feature/block14-controlled-locator-drift' }}
+        run: npx playwright test --project=chromium
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

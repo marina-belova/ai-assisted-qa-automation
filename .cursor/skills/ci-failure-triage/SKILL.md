@@ -5,9 +5,10 @@ description: >-
   CI build fails, a GitHub Actions run id or Actions URL is given, or the user
   asks to investigate, diagnose, or triage a Playwright CI failure. Pull logs
   and the playwright-report artifact with gh, classify product defect vs
-  test-code issue vs environment/credentials/flaky test, and write a structured
-  report. Do not file Jira tickets, post GitHub comments, merge, or push unless
-  the user approves.
+  TEST ISSUE — LOCATOR DRIFT vs other test-code issues vs
+  environment/credentials/flaky test, and write a structured report. Do not
+  file Jira tickets, post GitHub comments, merge, or push unless the user
+  approves.
 ---
 
 # CI Failure Triage
@@ -16,7 +17,7 @@ Diagnose a red **E2E Tests** run. Report in chat. Do not change tests, the workf
 
 ## Rules
 
-- Never merge a fix. Never push. Propose the fix; a human applies it.
+- Never merge a fix. Never push. Propose the fix; a human applies it. Do not edit the Page Object in this skill. Locator drift is repaired later by [self-heal](../self-heal/SKILL.md), and only after this report uses that classification.
 - Never create a Jira ticket unless the user explicitly approves that filing.
 - Never post a GitHub comment, review, or commit comment unless the user explicitly approves that post.
 - Never print or copy `DIDAXIS_URL`, `DIDAXIS_EMAIL`, `DIDAXIS_PASSWORD`, `DIDAXIS_API_TOKEN`, or any other secret. Logs mask them as `***`. Keep them masked.
@@ -101,9 +102,12 @@ Pick one primary class. State why in one short paragraph.
 
 | Class | Signals | Next step |
 |-------|---------|-----------|
-| **Product defect** | The app contradicts the spec or `Test Cases/` AC. The page loaded, auth worked, and the same assertion failed across retries. DOM or network evidence shows the wrong UI or API result. | Recommend a product fix. Draft what a Jira Bug would say. File it with [jira-bug-reporter](../jira-bug-reporter/SKILL.md) only after the user approves. |
-| **Test-code issue** | Wrong expected value, stale locator, assertion in the wrong place, or the test does not match current POM behavior. The page did load the correct behavior. Also `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match. | Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`. Keep the assertion's existing meaning. Do not edit files unless the user asks. |
-| **Environment / credentials / flaky test** | `setup` cannot authenticate, secrets missing, target URL unreachable, browser install failed, or the test passed on a later retry with no code change. Shared-catalog collisions and cleanup 401s belong here when the assertion never saw a product bug. | Name the failed step and the env var **name** only. Do not file a product bug. |
+| **Product defect** | The app contradicts the spec or `Test Cases/` AC. The page loaded, auth worked, and the same assertion failed across retries. DOM or network evidence shows the wrong UI or API result. The expected control is absent, not merely renamed. | Recommend a product fix. Draft what a Jira Bug would say. File it with [jira-bug-reporter](../jira-bug-reporter/SKILL.md) only after the user approves. Do not self-heal. |
+| **TEST ISSUE — LOCATOR DRIFT** | The locator no longer matches, and the accessibility tree, DOM snapshot, or error context still shows the expected element under its current role and accessible name. The page loaded and auth worked. Use this class only when both the stale locator and the surviving element are in evidence. | Name the Page Object file and line and quote the current role and accessible name. Do not edit the locator here. The parent may run [self-heal](../self-heal/SKILL.md). |
+| **Test-code issue** | Wrong expected value, assertion in the wrong place, or the test does not match current POM behavior. Also `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match. A stale locator whose target element was not shown belongs here or in Unclassified, not in locator drift. | Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`. Keep the assertion's existing meaning. Do not edit files unless the user asks. |
+| **Environment / credentials / flaky test** | `setup` cannot authenticate, secrets missing, configuration or project mismatch, target URL unreachable, browser install failed, or the test passed on a later retry with no code change. Shared-catalog collisions and cleanup 401s belong here when the assertion never saw a product bug. | Name the failed step and the env var **name** only. Do not file a product bug. Do not self-heal. |
+
+If the evidence does not fit one row, classify as `Unclassified` and list what is missing. Do not use **TEST ISSUE — LOCATOR DRIFT** as a default. Do not use it when the expected element is absent from the tree and the report.
 
 Checkout, `npm ci`, and `npx playwright install --with-deps chromium` succeeding means the red step is the Playwright command, not the runner image.
 
@@ -123,7 +127,7 @@ Reply with this structure. Omit a section only when the evidence does not exist,
 <one sentence: cause, not "the test failed">
 
 ### Classification
-Product defect | Test-code issue | Environment / credentials / flaky test
+TEST ISSUE — LOCATOR DRIFT | Product defect | Test-code issue | Environment / credentials / flaky test | Unclassified
 
 ### Failing test
 - Spec: `tests/...:<line>`
@@ -155,3 +159,4 @@ Jira and GitHub comments were not created. Say so.
 - [pom-conventions](../pom-conventions/SKILL.md) — locator and POM rules when the failure is on the test side
 - [api-cleanup](../api-cleanup/SKILL.md) — program create/delete and `DIDAXIS_API_TOKEN` refresh
 - [jira-bug-reporter](../jira-bug-reporter/SKILL.md) — Jira Bug only after the user approves a product-defect filing
+- [self-heal](../self-heal/SKILL.md) — locator repair only after this report classifies TEST ISSUE — LOCATOR DRIFT

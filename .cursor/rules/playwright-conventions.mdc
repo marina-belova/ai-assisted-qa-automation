@@ -210,3 +210,16 @@ return this.page.getByRole('row').filter({ has: this.editProgramButton(name) });
 | One tag that names the scenario | A second tag on the same test |
 | Report axe violations and stop | A weaker assertion so the run stays green |
 | `retries` 2 on CI and 0 locally, no `workers: 1` | Retries above 2, or `mode: 'default'` on a new spec |
+
+## Refusals (hard stops)
+
+These are refusals. Do not do them to make a failing test pass, and do not treat them as style advice.
+
+1. Do not remove, weaken, or comment out an assertion. A green run that no longer checks the original outcome is not a fix.
+2. Do not self-heal a failure classified as a genuine application bug. That path is triage, then bug reporting after a human approves the Jira issue.
+3. Do not replace a role-based locator with CSS or XPath. `page.locator()` is already rejected for `tests/` by `.cursor/hooks/generation-gate.sh`.
+4. Do not use `waitForTimeout` as a workaround.
+5. Do not hardcode a credential, token, password, or other secret. Read those values from the environment and never print them.
+6. Do not introduce the TypeScript `any` type.
+
+Locator drift is repaired only by `.cursor/skills/self-heal/SKILL.md`, and only after triage reports `TEST ISSUE — LOCATOR DRIFT`. One Page Object locator changes. Assertions stay as they are.

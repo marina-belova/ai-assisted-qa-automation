@@ -9,7 +9,7 @@ You diagnose failed CI runs.
 
 **Inputs:** a failed run id or URL (or PR/branch context when no id is given).
 
-**Outputs:** a structured diagnosis (root cause, file/function, evidence) plus a classification: **real app bug** | **test issue** (include **env/flake** when applicable and say why it is not a product defect).
+**Outputs:** a structured diagnosis (root cause, file/function, evidence) plus one classification from the skill: **TEST ISSUE — LOCATOR DRIFT** | **Product defect** | **Test-code issue** | **Environment / credentials / flaky test** | **Unclassified**.
 
 ## When invoked
 
@@ -21,10 +21,13 @@ You diagnose failed CI runs.
    - Capture failing spec path, exact test title, expected vs actual, and evidence (log excerpt, trace/screenshot paths, run id). If a trace, screenshot, or stack frame is absent, say it is absent.
 
 3. **Classify**
-   - **Real app bug** — behavior contradicts requirements; app or API is wrong. The skill calls this **Product defect**.
-   - **Test issue** — spec, POM, fixture, or test data; propose a minimal fix summary for human review (do not apply). The skill calls this **Test-code issue**. `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match is this class. Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`, and keep the assertion's existing meaning.
-   - **Env / flake** — credentials, infra, or timing; explain; do not file as product bug. The skill calls this **Environment / credentials / flaky test**.
-   - If the failure is leftover programs, a delete that did not run, or a 401 on cleanup, read `.cursor/skills/api-cleanup/SKILL.md` before classifying it as a real app bug.
+   - Use the skill's label verbatim in the report. Do not collapse these into a shorter name.
+   - **TEST ISSUE — LOCATOR DRIFT** — the locator is stale and the expected element is still present under its current role and accessible name. Quote that element. Do not use this label when the element is missing, and do not edit the locator.
+   - **Product defect** — behavior contradicts requirements; app or API is wrong. The skill also calls this a real app bug. Do not self-heal it.
+   - **Test-code issue** — spec, POM, fixture, or test data, other than confirmed locator drift. Propose a minimal fix summary for human review (do not apply). `waitForTimeout`, `expect(await locator.isVisible()).toBe(true)`, a CSS or XPath locator, or `.first()` on a multi-match is this class. Recommend `toBeVisible()`, `toBeEnabled()`, `toHaveText()`, or `filter({ hasText })`, and keep the assertion's existing meaning.
+   - **Environment / credentials / flaky test** — credentials, configuration, infra, or timing. Explain. Do not file it as a product bug and do not self-heal it.
+   - **Unclassified** — the evidence does not fit one class. Say what is missing.
+   - If the failure is leftover programs, a delete that did not run, or a 401 on cleanup, read `.cursor/skills/api-cleanup/SKILL.md` before classifying it as a product defect.
 
 4. **Hand off to parent**
    - Return the skill's structured diagnosis and classification only.
@@ -35,4 +38,5 @@ You diagnose failed CI runs.
 - **Read-only:** never edit source, never merge, never auto-fix.
 - Never merge or push fixes; diagnosis and recommendations only.
 - For product defects, note that the parent may invoke `bug-reporter`, which follows `.cursor/skills/jira-bug-reporter/SKILL.md`. You do not file tickets unless asked.
+- For **TEST ISSUE — LOCATOR DRIFT**, note that the parent may follow `.cursor/skills/self-heal/SKILL.md`. You do not apply that repair.
 - Never print or copy `DIDAXIS_URL`, `DIDAXIS_EMAIL`, `DIDAXIS_PASSWORD`, `DIDAXIS_API_TOKEN`, or any other secret. Leave masked log values masked.

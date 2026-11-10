@@ -117,16 +117,20 @@ export class ProgramsPage {
     return modal;
   }
 
-  async createProgram(name: string, description = '', options?: { reloadAfterCreate?: boolean }): Promise<string | void> {
+  async createProgram(
+    name: string,
+    description = '',
+    options?: { reloadAfterCreate?: boolean; onCreated?: (id: string) => void },
+  ): Promise<string | void> {
     const modal = await this.openNewProgramForm();
     await modal.fillProgramName(name);
     if (description) {
       await modal.fillDescription(description);
     }
     if (options?.reloadAfterCreate) {
-      return modal.submitCreateWithReload();
+      return modal.submitCreateWithReload(options.onCreated);
     }
-    await modal.submitCreateAndWaitForListRefresh();
+    await modal.submitCreateAndWaitForListRefresh(options?.onCreated);
   }
 
   async openEditProgram(name: string): Promise<EditProgramModal> {
@@ -183,10 +187,14 @@ export class ProgramsPage {
     return dialogMessage;
   }
 
-  async confirmDeleteProgram(name: string): Promise<string> {
+  async confirmDeleteProgram(name: string, onDeleted?: (id: string) => void): Promise<string> {
     const deleted = this.page.waitForResponse((response) => isProgramItemResponse(response, 'DELETE'));
     const message = await this.respondToDeleteConfirmation(name, true);
-    await deleted;
+    const response = await deleted;
+    if (onDeleted) {
+      const id = new URL(response.url()).pathname.match(/\/api\/programs\/([^/]+)$/)?.[1];
+      if (id) onDeleted(id);
+    }
     return message;
   }
 

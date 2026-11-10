@@ -30,7 +30,7 @@ test.describe('Programs accessibility', () => {
     ]);
   });
 
-  test('New Program modal has no axe violations within dialog scope', async ({ page }) => {
+  test('New Program modal has no axe violations within dialog scope', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
     await expect(modal.dialog).toBeVisible({ timeout: 15_000 });

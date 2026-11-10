@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Positive flows', () => {
-  test('TC-001: program creation form displays required fields', async ({ page }) => {
+  test('TC-001: program creation form displays required fields', { tag: '@sanity' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
 
@@ -22,7 +22,7 @@ test.describe('Positive flows', () => {
     await expect(modal.cancelButton).toBeVisible();
   });
 
-  test('TC-002: program is created successfully with valid name and description', async ({ page, trackProgram }) => {
+  test('TC-002: program is created successfully with valid name and description', { tag: '@smoke' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Web Development 2026');
     const description = 'Full-stack web development program';
@@ -30,27 +30,27 @@ test.describe('Positive flows', () => {
 
     await modal.fillProgramName(name);
     await modal.fillDescription(description);
-    trackProgram(await modal.submitCreateWithReload());
+    await modal.submitCreateWithReload(trackProgram);
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
     await expect(programs.alerts).toHaveCount(0);
   });
 
-  test('TC-003: program is created successfully with name only and empty description', async ({ page, trackProgram }) => {
+  test('TC-003: program is created successfully with name only and empty description', { tag: '@sanity' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Data Science Fundamentals');
     const modal = await programs.openNewProgramForm();
 
     await modal.fillProgramName(name);
-    trackProgram(await modal.submitCreateWithReload());
+    await modal.submitCreateWithReload(trackProgram);
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.programCellByExactName(name)).toHaveText(name);
     await expect(programs.alerts).toHaveCount(0);
   });
 
-  test('TC-004: Create button remains disabled until Program Name is provided', async ({ page }) => {
+  test('TC-004: Create button remains disabled until Program Name is provided', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
 
@@ -58,7 +58,7 @@ test.describe('Positive flows', () => {
     await expect(modal.createButton).toBeDisabled();
   });
 
-  test('TC-005: Create button becomes enabled after entering a valid Program Name', async ({ page }) => {
+  test('TC-005: Create button becomes enabled after entering a valid Program Name', { tag: '@sanity' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
 
@@ -69,7 +69,7 @@ test.describe('Positive flows', () => {
 });
 
 test.describe('Negative flows', () => {
-  test('TC-006: program is not created when submission is attempted with empty Program Name', async ({ page }) => {
+  test('TC-006: program is not created when submission is attempted with empty Program Name', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
 
@@ -79,7 +79,7 @@ test.describe('Negative flows', () => {
     await expect(modal.dialog).toBeVisible();
   });
 
-  test('TC-007: program is not created when user cancels the creation form', async ({ page }) => {
+  test('TC-007: program is not created when user cancels the creation form', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Cancelled Program');
     const modal = await programs.openNewProgramForm();
@@ -94,7 +94,7 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-010: program name at maximum allowed length is accepted', async ({ page, trackProgram }) => {
+  test('TC-010: program name at maximum allowed length is accepted', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const suffix = ` ${Date.now()}`;
     const name = `${'A'.repeat(255 - suffix.length)}${suffix}`;
@@ -102,24 +102,24 @@ test.describe('Edge cases', () => {
 
     await modal.fillProgramName(name);
     await modal.fillDescription('Boundary length test');
-    trackProgram(await modal.submitCreateWithReload());
+    await modal.submitCreateWithReload(trackProgram);
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
   });
 
-  test('TC-012: program name with special characters is accepted', async ({ page, trackProgram }) => {
+  test('TC-012: program name with special characters is accepted', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Informatique & IA - Niveau 2');
     const modal = await programs.openNewProgramForm();
 
     await modal.fillProgramName(name);
     await modal.fillDescription('Program with special characters');
-    trackProgram(await modal.submitCreateWithReload());
+    await modal.submitCreateWithReload(trackProgram);
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
   });
 
-  test('TC-013: program name with only whitespace is treated as empty', async ({ page }) => {
+  test('TC-013: program name with only whitespace is treated as empty', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const modal = await programs.openNewProgramForm();
 
@@ -129,7 +129,7 @@ test.describe('Edge cases', () => {
     await expect(modal.dialog).toBeVisible();
   });
 
-  test('TC-014: description at maximum allowed length is accepted', async ({ page, trackProgram }) => {
+  test('TC-014: description at maximum allowed length is accepted', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Long Description Program');
     const marker = `D${Date.now()}`;
@@ -138,13 +138,13 @@ test.describe('Edge cases', () => {
 
     await modal.fillProgramName(name);
     await modal.fillDescription(description);
-    trackProgram(await modal.submitCreateWithReload());
+    await modal.submitCreateWithReload(trackProgram);
 
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
   });
 
-  test('TC-015: closing modal via Escape does not create a program', async ({ page }) => {
+  test('TC-015: closing modal via Escape does not create a program', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueNameSimple('Unsaved Program');
     const modal = await programs.openNewProgramForm();

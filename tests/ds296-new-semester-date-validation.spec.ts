@@ -11,16 +11,18 @@ test.beforeEach(async ({ page }) => {
 test.describe('Verify New Semester date validation', () => {
   test(
     'Create Semester stays disabled when the end date is empty',
-    { tag: '@ds296-end-empty' },
+    { tag: '@regression' },
     async ({ page, trackProgram }) => {
       const programs = new ProgramsPage(page);
       const name = uniqueNameSimple('Program without semesters');
       const description = 'Semester panel seed';
-      const uuid = await programs.createProgram(name, description, { reloadAfterCreate: true });
+      const uuid = await programs.createProgram(name, description, {
+        reloadAfterCreate: true,
+        onCreated: trackProgram,
+      });
       if (typeof uuid !== 'string') {
         throw new Error('createProgram did not return a program uuid');
       }
-      trackProgram(uuid);
 
       await programs.selectProgram(name);
       await expect(programs.semesterPanelHeading(name)).toBeVisible();
@@ -38,16 +40,18 @@ test.describe('Verify New Semester date validation', () => {
 
   test(
     'Create Semester becomes enabled for a date range that ends after it starts',
-    { tag: '@ds296-valid-range' },
+    { tag: '@regression' },
     async ({ page, trackProgram }) => {
       const programs = new ProgramsPage(page);
       const name = uniqueNameSimple('Program without semesters');
       const description = 'Semester panel seed';
-      const uuid = await programs.createProgram(name, description, { reloadAfterCreate: true });
+      const uuid = await programs.createProgram(name, description, {
+        reloadAfterCreate: true,
+        onCreated: trackProgram,
+      });
       if (typeof uuid !== 'string') {
         throw new Error('createProgram did not return a program uuid');
       }
-      trackProgram(uuid);
 
       await programs.selectProgram(name);
       await expect(programs.semesterPanelHeading(name)).toBeVisible();
@@ -64,16 +68,18 @@ test.describe('Verify New Semester date validation', () => {
 
   test(
     'An end date before the start date is saved without an error message',
-    { tag: '@ds296-end-before-start' },
+    { tag: '@regression' },
     async ({ page, trackProgram }) => {
       const programs = new ProgramsPage(page);
       const name = uniqueNameSimple('Program without semesters');
       const description = 'Semester panel seed';
-      const uuid = await programs.createProgram(name, description, { reloadAfterCreate: true });
+      const uuid = await programs.createProgram(name, description, {
+        reloadAfterCreate: true,
+        onCreated: trackProgram,
+      });
       if (typeof uuid !== 'string') {
         throw new Error('createProgram did not return a program uuid');
       }
-      trackProgram(uuid);
 
       await programs.selectProgram(name);
       await expect(programs.semesterPanelHeading(name)).toBeVisible();

@@ -19,7 +19,7 @@ You author Playwright tests for Didaxis from a test plan.
 2. **Follow project skills (read before writing)**
    - `.cursor/skills/pom-conventions/SKILL.md` — all UI via Page Objects in `pages/`; no inline locators; assertions only in specs. Follow its flake-prevention rules.
    - `.cursor/rules/playwright-conventions.mdc` — locator order, web-first waits, cleanup, and `page.clock.install()` for a relative timestamp.
-   - `.cursor/skills/api-cleanup/SKILL.md` — import `test` from `fixtures/cleanup.fixture.ts` and `trackProgram(uuid)` when tests create programs.
+   - `.cursor/skills/api-cleanup/SKILL.md` — import `test` from `fixtures/cleanup.fixture.ts`. Pass `trackProgram` into `submitCreateWithReload` or `createProgram`'s `onCreated`. `afterEach` deletes ids still tracked. Pass `untrackProgram` to `confirmDeleteProgram`; that callback runs only after a successful UI DELETE of that id.
    - `.cursor/skills/network-mocking/SKILL.md` — `page.route()` and `route.fulfill()` for a Programs save or list. Inspect the mocked UI with Playwright MCP before writing an assertion. Assert only behavior that inspection showed. Do not invent error messages.
    - `.cursor/skills/a11y-checks/SKILL.md` — Programs axe scan uses `.withTags(['wcag2a', 'wcag2aa'])` and `expect(results.violations).toEqual([])`. No `disableRules()`. Keyboard coverage tabs to the New Program button. Exactly one tag. If violations are found, report them and stop.
 

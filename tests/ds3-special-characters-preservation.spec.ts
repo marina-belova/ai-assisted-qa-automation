@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   await expect(programs.newProgramButton).toBeVisible({ timeout: 30_000 });
 });
 
-test('TC-001: program name with special characters is preserved exactly in the list', async ({
+test('TC-001: program name with special characters is preserved exactly in the list', { tag: '@regression' }, async ({
   page,
   trackProgram,
 }) => {
@@ -26,7 +26,7 @@ test('TC-001: program name with special characters is preserved exactly in the l
   await expect(modal.dialog).toBeVisible({ timeout: 15_000 });
   await modal.fillProgramName(name);
   await modal.fillDescription(description);
-  trackProgram(await modal.submitCreateWithReload());
+  await modal.submitCreateWithReload(trackProgram);
 
   await programs.scrollProgramNameIntoView(name);
   await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });

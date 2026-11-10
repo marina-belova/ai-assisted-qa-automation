@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import { ProgramsPage } from '../pages/ProgramsPage';
 import { nameOfLength, uniqueName } from '../utils/test-data';
 
@@ -12,11 +12,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Positive flows', () => {
-  test('TC-001: edit form opens pre-populated with current program data', async ({ page }) => {
+  test('TC-001: edit form opens pre-populated with current program data', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -28,11 +28,11 @@ test.describe('Positive flows', () => {
     await expect(modal.cancelButton).toBeVisible();
   });
 
-  test('TC-002: program name is updated and reflected immediately in the list', async ({ page }) => {
+  test('TC-002: program name is updated and reflected immediately in the list', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const updatedName = `${name} - Updated`;
-    await programs.createProgram(name, 'Full-stack web development program');
+    await programs.createProgram(name, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const reloads = programs.trackReloads();
@@ -47,12 +47,12 @@ test.describe('Positive flows', () => {
     expect(reloads()).toBe(0);
   });
 
-  test('TC-003: unchanged fields are preserved when only description is edited', async ({ page }) => {
+  test('TC-003: unchanged fields are preserved when only description is edited', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
     const updatedDescription = 'Updated full-stack curriculum for 2026';
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -70,12 +70,12 @@ test.describe('Positive flows', () => {
     await expect(reopened.descriptionField).toHaveValue(updatedDescription);
   });
 
-  test('TC-004: both name and description can be updated in a single edit', async ({ page }) => {
+  test('TC-004: both name and description can be updated in a single edit', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Mobile Development 2026');
     const updatedName = `${name} - Advanced`;
     const updatedDescription = 'Advanced iOS and Android development track';
-    await programs.createProgram(name, 'iOS and Android development');
+    await programs.createProgram(name, 'iOS and Android development', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -90,10 +90,10 @@ test.describe('Positive flows', () => {
     await expect(programs.programNameText(name)).toHaveCount(0);
   });
 
-  test('TC-005: save button is enabled when valid changes are made', async ({ page }) => {
+  test('TC-005: save button is enabled when valid changes are made', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
-    await programs.createProgram(name, 'Full-stack web development program');
+    await programs.createProgram(name, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);
@@ -105,12 +105,12 @@ test.describe('Positive flows', () => {
 });
 
 test.describe('Negative flows', () => {
-  test('TC-006: program is not updated when user cancels the edit form', async ({ page }) => {
+  test('TC-006: program is not updated when user cancels the edit form', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
     const rejectedName = uniqueName('Should Not Save');
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);
@@ -125,11 +125,11 @@ test.describe('Negative flows', () => {
     await expect(programs.programNameText(rejectedName)).toHaveCount(0);
   });
 
-  test('TC-007: empty program name prevents save', async ({ page }) => {
+  test('TC-007: empty program name prevents save', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);
@@ -144,11 +144,11 @@ test.describe('Negative flows', () => {
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
   });
 
-  test('TC-010: no update occurs when save is clicked without any changes', async ({ page }) => {
+  test('TC-010: no update occurs when save is clicked without any changes', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);
@@ -165,11 +165,11 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-011: program name with special characters is accepted on edit', async ({ page }) => {
+  test('TC-011: program name with special characters is accepted on edit', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Basic Programming');
     const updatedName = uniqueName('Informatique & IA - Niveau 2');
-    await programs.createProgram(name, 'Introductory programming');
+    await programs.createProgram(name, 'Introductory programming', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -182,11 +182,11 @@ test.describe('Edge cases', () => {
     await expect(programs.programNameText(name)).toHaveCount(0);
   });
 
-  test('TC-012: program name with only whitespace is rejected on edit', async ({ page }) => {
+  test('TC-012: program name with only whitespace is rejected on edit', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
-    await programs.createProgram(name, description);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);
@@ -201,11 +201,11 @@ test.describe('Edge cases', () => {
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
   });
 
-  test('TC-013: program name at maximum allowed length is accepted on edit', async ({ page }) => {
+  test('TC-013: program name at maximum allowed length is accepted on edit', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Short Name');
     const updatedName = nameOfLength(255);
-    await programs.createProgram(name, 'Boundary length test');
+    await programs.createProgram(name, 'Boundary length test', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -218,10 +218,10 @@ test.describe('Edge cases', () => {
     expect(updatedName).toHaveLength(255);
   });
 
-  test('TC-015: description can be cleared to empty on edit', async ({ page }) => {
+  test('TC-015: description can be cleared to empty on edit', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
-    await programs.createProgram(name, 'Full-stack web development program');
+    await programs.createProgram(name, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const modal = await programs.openEditProgram(name);

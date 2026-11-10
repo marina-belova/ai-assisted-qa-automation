@@ -13,7 +13,7 @@ test.describe('Programs Edit Program modal accessibility', () => {
     await expect(programs.newProgramButton).toBeVisible({ timeout: 30_000 });
   });
 
-  test('Edit Program modal has no axe violations within dialog scope', async ({ page, trackProgram }) => {
+  test('Edit Program modal has no axe violations within dialog scope', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('A11y Edit Program');
     const description = 'Program used for Edit Program modal accessibility scan';
@@ -22,7 +22,7 @@ test.describe('Programs Edit Program modal accessibility', () => {
     await expect(createModal.dialog).toBeVisible({ timeout: 15_000 });
     await createModal.fillProgramName(name);
     await createModal.fillDescription(description);
-    trackProgram(await createModal.submitCreateWithReload());
+    await createModal.submitCreateWithReload(trackProgram);
 
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });

@@ -1,0 +1,50 @@
+---
+description: Always-on constitution and confidence gate for this Playwright project.
+alwaysApply: true
+---
+
+# Constitution
+
+Always-on rules for this Playwright project. Locator order, auth, cleanup, and assertion details stay in `.cursor/rules/playwright-conventions.mdc`. Routing stays in `.cursor/rules/qa-orchestration.mdc`.
+
+## MUST
+
+| Rule |
+| --- |
+| Role-based locators |
+| Web-first assertions |
+| storageState authentication |
+| Unique, self-cleaning test data |
+| Exactly one approved tag per test |
+
+Approved tags are `@smoke`, `@sanity`, `@regression`, `@api`, `@e2e`, and `@destructive`.
+
+## SHOULD
+
+| Rule |
+| --- |
+| Faker factories |
+| Enums for repeated strings |
+| JSDoc on Page Object action methods |
+
+## WON'T
+
+| Rule |
+| --- |
+| XPath |
+| waitForTimeout |
+| Hardcoded credentials or secrets |
+| TypeScript `any` |
+| Weakened or removed assertions |
+| Healing genuine application defects |
+| Tags on `test.describe()` |
+
+## Index
+
+Skills: a11y-checks, api-cleanup, ci-failure-triage, explore-and-generate, exploratory-charter, jira-bug-reporter, jira-ticket-to-gherkin, network-mocking, pom-conventions, self-heal. Agents: bug-reporter, test-writer, triage.
+
+## Agent governance
+
+Audit the relevant rules and code before editing. Every non-trivial task produces a Proposal before the first edit: Scope, Confidence (1–10), Rationale, and Unknowns.
+
+Confidence below 5: stop and request the missing information. Confidence 5–7: state the unknowns and wait for human approval. Confidence 8–10: proceed after the audit. Never invent a path, enum, environment variable, credential, or message. Ask or inspect the repository. This gate does not replace the human approval required before a merge or a filed Jira bug.

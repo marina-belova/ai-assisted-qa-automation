@@ -48,7 +48,9 @@ Do **not** duplicate page-level actions (login, open create form, submit create/
 Tests that **create** programs and should not leave data behind:
 
 - Import `test` and `expect` from `fixtures/cleanup.fixture.ts` (not `@playwright/test` alone).
-- Call `trackProgram(uuid)` immediately after create when the UUID is known.
+- Pass `trackProgram` into the create helper: `submitCreateWithReload(trackProgram)` or `createProgram(name, description, { onCreated: trackProgram })`. The helper registers the id immediately after the successful POST returns `data.id`, before later UI waits.
+- When the test deletes that program through the UI, pass `untrackProgram` to `confirmDeleteProgram`. Unregister only after the successful DELETE for that id. A cancelled or failed UI DELETE leaves the id tracked.
+- `afterEach` in the fixture deletes tracked ids. Do not use fixture teardown or `afterAll` for cleanup.
 - See the `api-cleanup` skill.
 
 ## Test file naming

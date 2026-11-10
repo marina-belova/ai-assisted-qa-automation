@@ -38,7 +38,7 @@ export class NewProgramModal {
     await this.page.keyboard.press('Escape');
   }
 
-  async submitCreateWithReload(): Promise<string> {
+  async submitCreateWithReload(onCreated?: (id: string) => void): Promise<string> {
     const created = this.page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await this.clickCreate();
     const response = await created;
@@ -48,6 +48,7 @@ export class NewProgramModal {
     if (!uuid) {
       throw new Error('Create program response did not include data.id');
     }
+    onCreated?.(uuid);
     if (!name) {
       throw new Error('Create program response did not include data.name');
     }
@@ -64,13 +65,21 @@ export class NewProgramModal {
     return uuid;
   }
 
-  async submitCreateAndWaitForListRefresh(): Promise<void> {
+  async submitCreateAndWaitForListRefresh(onCreated?: (id: string) => void): Promise<void> {
     const created = this.page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     const refreshed = this.page.waitForResponse((response) => isProgramsResponse(response, 'GET'), {
       timeout: 60_000,
     });
     await this.clickCreate();
-    await created;
+    const response = await created;
+    if (onCreated) {
+      const body = (await response.json()) as { data?: { id?: string } };
+      const id = body.data?.id;
+      if (!id) {
+        throw new Error('Create program response did not include data.id');
+      }
+      onCreated(id);
+    }
     await this.dialog.waitFor({ state: 'hidden', timeout: 30_000 });
     await refreshed;
     await waitUntilDialogsClosed(this.page);

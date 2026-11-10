@@ -9,6 +9,11 @@
       {
         "command": ".cursor/hooks/heal-gate.sh",
         "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/constitution-gate.sh",
+        "matcher": "Write",
+        "failClosed": true
       }
     ]
   }

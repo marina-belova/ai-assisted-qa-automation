@@ -44,7 +44,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Positive flows', () => {
-  test('TC-001: new todo appears in the list', async ({ page }) => {
+  test('TC-001: new todo appears in the list', { tag: '@smoke' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
 
     const item = todoItem(page, 'Buy milk');
@@ -54,7 +54,7 @@ test.describe('Positive flows', () => {
     await expect(itemsLeft(page, 1)).toBeVisible();
   });
 
-  test('TC-002: completed todo is marked done and no longer counted as left', async ({ page }) => {
+  test('TC-002: completed todo is marked done and no longer counted as left', { tag: '@sanity' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
 
     await completeTodo(page, 'Buy milk');
@@ -66,7 +66,7 @@ test.describe('Positive flows', () => {
     await expect(itemsLeft(page, 0)).toBeVisible();
   });
 
-  test('TC-003: deleted todo is removed from the list', async ({ page }) => {
+  test('TC-003: deleted todo is removed from the list', { tag: '@sanity' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
     await addTodo(page, 'Walk dog');
 
@@ -79,7 +79,7 @@ test.describe('Positive flows', () => {
 });
 
 test.describe('Negative flows', () => {
-  test('TC-004: empty input does not add a todo', async ({ page }) => {
+  test('TC-004: empty input does not add a todo', { tag: '@regression' }, async ({ page }) => {
     const input = newTodoInput(page);
     await input.click();
     await input.press('Enter');
@@ -88,7 +88,7 @@ test.describe('Negative flows', () => {
     await expect(page.getByText(/\d+ items? left/)).toBeHidden();
   });
 
-  test('TC-005: completing a todo does not remove it', async ({ page }) => {
+  test('TC-005: completing a todo does not remove it', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
 
     await completeTodo(page, 'Buy milk');
@@ -98,7 +98,7 @@ test.describe('Negative flows', () => {
     await expect(todoItems(page)).toHaveCount(1);
   });
 
-  test('TC-006: deleting one todo does not delete the others', async ({ page }) => {
+  test('TC-006: deleting one todo does not delete the others', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
     await addTodo(page, 'Walk dog');
     await addTodo(page, 'Pay rent');
@@ -113,13 +113,13 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-007: whitespace-only input does not add a todo', async ({ page }) => {
+  test('TC-007: whitespace-only input does not add a todo', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, '   ');
 
     await expect(todoItems(page)).toHaveCount(0);
   });
 
-  test('TC-008: leading and trailing spaces are trimmed from the saved title', async ({ page }) => {
+  test('TC-008: leading and trailing spaces are trimmed from the saved title', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, '  Buy milk  ');
 
     const title = todoItem(page, 'Buy milk').getByText('Buy milk', { exact: true });
@@ -127,14 +127,14 @@ test.describe('Edge cases', () => {
     expect(await title.textContent()).toBe('Buy milk');
   });
 
-  test('TC-009: a single-character title is saved', async ({ page }) => {
+  test('TC-009: a single-character title is saved', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, 'A');
 
     await expect(todoItem(page, 'A')).toBeVisible();
     await expect(itemsLeft(page, 1)).toBeVisible();
   });
 
-  test('TC-010: special characters are saved and displayed as plain text', async ({ page }) => {
+  test('TC-010: special characters are saved and displayed as plain text', { tag: '@regression' }, async ({ page }) => {
     const title = 'Buy milk & eggs <today>';
     await addTodo(page, title);
 
@@ -143,7 +143,7 @@ test.describe('Edge cases', () => {
     expect(await rendered.innerHTML()).toBe('Buy milk &amp; eggs &lt;today&gt;');
   });
 
-  test('TC-011: duplicate titles are both kept', async ({ page }) => {
+  test('TC-011: duplicate titles are both kept', { tag: '@regression' }, async ({ page }) => {
     await addTodo(page, 'Buy milk');
     await addTodo(page, 'Buy milk');
 
@@ -151,7 +151,7 @@ test.describe('Edge cases', () => {
     await expect(itemsLeft(page, 2)).toBeVisible();
   });
 
-  test('TC-012: a long title is saved in full', async ({ page }) => {
+  test('TC-012: a long title is saved in full', { tag: '@regression' }, async ({ page }) => {
     const title = 'A'.repeat(200);
     await addTodo(page, title);
 

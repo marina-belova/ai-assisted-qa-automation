@@ -80,19 +80,35 @@ await this.saveButton.click();
 
 ## 5. Test Data
 
-**Standard.** Build names with `uniqueName`, `uniqueNameSimple`, or `nameOfLength` from `utils/test-data.ts`. Each appends `Date.now()`. When a test creates a program, import `test` from `fixtures/cleanup.fixture.ts` and call `trackProgram(uuid)` as soon as `data.id` is known. The fixture deletes only those ids. Do not add a cleanup `afterAll`. Do not delete a program the test did not create. Bulk cleanup requires explicit human approval and is not part of a spec run.
+**Standard.** Build names with `uniqueName`, `uniqueNameSimple`, or `nameOfLength` from `utils/test-data.ts`. Each appends `Date.now()`. When a test creates a program, import `test` from `fixtures/cleanup.fixture.ts` and pass `trackProgram` into the create helper. The helper calls it immediately after the successful `POST` returns `data.id`, before the dialog, reload, and row waits. `afterEach` in that fixture deletes every id still tracked for the test with `DELETE /api/programs/<uuid>`. A 401 refreshes the token once and retries that delete. Any other non-2xx status, including 404, throws. Do not treat a cleanup failure as success. When the test confirms deletion in the UI, pass `untrackProgram` to `confirmDeleteProgram`. The Page Object calls that callback only after the DELETE response succeeds and the id is in that response URL. `untrackProgram` removes only that id. A dismissed confirmation does not unregister. If the UI delete does not succeed, the id stays tracked and `afterEach` deletes it. Do not add a cleanup `afterAll`. Do not delete a program the test did not create. Bulk cleanup requires explicit human approval and is not part of a spec run.
 
 **GOOD.** In the repo, `tests/ds1-create-program.spec.ts`:
 
 ```ts
 import { test, expect } from '../fixtures/cleanup.fixture';
-const name = uniqueName('Web Development 2026');
+const name = uniqueNameSimple('Web Development 2026');
+await modal.submitCreateWithReload(trackProgram);
+```
+
+`tests/ds2-create-program.spec.ts`, `tests/ds2-edit-program-regression.spec.ts`, and `tests/ds3-program-name-rules.spec.ts` register through `createProgram(name, description, { onCreated: trackProgram })`. `tests/ds4-delete-program.spec.ts` TC-001 passes `untrackProgram` to `confirmDeleteProgram` after that registration.
+
+**BAD.** Do not register only after the helper returns:
+
+```ts
 trackProgram(await modal.submitCreateWithReload());
 ```
 
-**BAD.** In the repo, `tests/ds2-create-program.spec.ts`, `tests/ds2-edit-program-regression.spec.ts`, and `tests/ds3-program-name-rules.spec.ts` call `createProgram` and do not track the id.
+That call runs after the reload and row waits. A failure during those waits leaves the created program untracked. Do not call `untrackProgram` before the UI DELETE is confirmed, and do not ignore a non-2xx cleanup status.
 
-**Prevents.** Leftover programs that collide with later tests and make the shared catalog slower and less deterministic.
+**Prevents.** Leftover programs that collide with later tests, a second DELETE of an id the UI already removed, and a cleanup failure that the run treats as success.
+
+**Factories.** Happy-path builders live in `test-data/factories/`. `test-data/factories/program.ts` exports `buildProgram()`. It returns `name` and `description`, the Program Name and Description fields on `pages/NewProgramModal.ts`. Readable text comes from `@faker-js/faker` 10.6.0 (`node ^20.19.0 || ^22.13.0 || >=24`, which matches CI Node 20.20.2 and local Node 24). The name still goes through `uniqueName()`. No spec imports the factory yet. Keep using `utils/test-data.ts` until a spec is switched on purpose.
+
+**Invalid data.** Curated invalid values belong in static `.ts` files. Do not ask Faker for an empty name, a whitespace-only name, or a name outside the length a spec already asserts.
+
+**Secrets and URLs.** Read `DIDAXIS_URL`, `DIDAXIS_EMAIL`, `DIDAXIS_PASSWORD`, and `DIDAXIS_API_TOKEN` from `process.env`. `requireBaseUrl()` in `utils/test-data.ts` is the URL helper. A factory does not contain a credential, a token, or a host.
+
+**Enums.** Repeated request paths and repeated UI messages belong in enums. This factory does not add one. Do not invent a path or a message for an enum until the repo already uses that string.
 
 ## 6. API Testing
 
@@ -107,9 +123,9 @@ const api = await request.newContext({
 await api.delete(`/api/programs/${id}`);
 ```
 
-`fixtures/cleanup.fixture.ts` retries that delete once when the status is 401.
+`fixtures/cleanup.fixture.ts` runs that delete from `afterEach`. It retries once when the status is 401. Any other non-ok status throws `Cleanup failed for ${id}: ${status}`.
 
-**BAD.** Not in the repo yet: a cleanup that clicks Delete in the UI, or a token written into source. Do not add either.
+**BAD.** Not in the repo: a cleanup that only clicks Delete and never deletes through the API, or a token written into source. A confirmed UI delete unregisters that program id. It does not replace `afterEach`. Do not add a UI-only cleanup or a hardcoded token.
 
 **Prevents.** A cleanup path that depends on the same UI the test may have broken, and a 401 that leaves the program behind after the access token expires.
 
@@ -200,7 +216,8 @@ return this.page.getByRole('row').filter({ has: this.editProgramButton(name) });
 | Locators in the Page Object constructor; assertions in the spec | `expect()` inside `pages/` |
 | Stored `playwright/.auth/user.json` for feature tests | UI login in every feature test |
 | Empty `storageState` and `/login` for a login-page test | A login test that loads `user.json` |
-| `uniqueName` and `trackProgram` for a program the test created | A create test with no cleanup, or a delete of data the test did not create |
+| `uniqueName`, and `trackProgram` passed into the create helper; `afterEach` deletes ids still tracked | A create test with no cleanup, `untrackProgram` before a confirmed UI delete, or a delete of data the test did not create |
+| `test-data/factories/program.ts` for a happy-path Program name and description | Faker output for an empty name, a secret, or a URL |
 | Bulk cleanup only after explicit human approval | A spec that deletes the catalog |
 | Bearer token from `POST /api/auth/login` for API cleanup | A hardcoded token, or UI clicks to prove an API contract |
 | `page.route()` and `route.fulfill()` on the one Programs request under test | A mock of an unrelated endpoint, or an invented error sentence |

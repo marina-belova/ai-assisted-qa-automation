@@ -14,32 +14,18 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Positive flows', () => {
-  test('TC-001: program list displays name and description for each program', async ({ page, trackProgram }) => {
+  test('TC-001: program list displays name and description for each program', { tag: '@smoke' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const webName = uniqueName('Web Development 2026');
     const webDescription = 'Full-stack web development program';
     const dataName = uniqueName('Data Science 2026');
     const dataDescription = 'Machine learning and analytics program';
 
-    const webCreated = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(webName, webDescription);
-    const webBody = (await (await webCreated).json()) as { data?: { id?: string } };
-    const webId = webBody.data?.id;
-    if (!webId) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(webId);
+    await programs.createProgram(webName, webDescription, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(webName);
     await expect(programs.programNameText(webName)).toBeVisible();
 
-    const dataCreated = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(dataName, dataDescription);
-    const dataBody = (await (await dataCreated).json()) as { data?: { id?: string } };
-    const dataId = dataBody.data?.id;
-    if (!dataId) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(dataId);
+    await programs.createProgram(dataName, dataDescription, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(dataName);
     await expect(programs.programNameText(dataName)).toBeVisible();
 
@@ -47,18 +33,11 @@ test.describe('Positive flows', () => {
     await expect(programs.textInProgramCell(dataName, dataDescription)).toBeVisible();
   });
 
-  test('TC-005: program list updates immediately after editing a program', async ({ page, trackProgram }) => {
+  test('TC-005: program list updates immediately after editing a program', { tag: '@sanity' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const updatedDescription = 'Updated curriculum';
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name, 'Full-stack web development program');
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const reloads = programs.trackReloads();
@@ -71,26 +50,19 @@ test.describe('Positive flows', () => {
     expect(reloads()).toBe(0);
   });
 
-  test('TC-006: program list updates immediately after deleting a program', async ({ page, trackProgram }) => {
+  test('TC-006: program list updates immediately after deleting a program', { tag: '@sanity' }, async ({ page, trackProgram, untrackProgram }) => {
     const programs = new ProgramsPage(page);
     const keptName = uniqueName('Web Development 2026');
     const deletedName = uniqueName('Data Science 2026');
-    const keptCreated = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(keptName, 'Full-stack web development program');
-    const keptBody = (await (await keptCreated).json()) as { data?: { id?: string } };
-    const keptId = keptBody.data?.id;
-    if (!keptId) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(keptId);
+    await programs.createProgram(keptName, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(keptName);
     await expect(programs.programNameText(keptName)).toBeVisible();
-    await programs.createProgram(deletedName, 'Machine learning and analytics program');
+    await programs.createProgram(deletedName, 'Machine learning and analytics program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(deletedName);
     await expect(programs.programNameText(deletedName)).toBeVisible();
     const reloads = programs.trackReloads();
 
-    await programs.confirmDeleteProgram(deletedName);
+    await programs.confirmDeleteProgram(deletedName, untrackProgram);
 
     await expect(programs.programNameText(deletedName)).toHaveCount(0, { timeout: 45_000 });
     await programs.scrollProgramNameIntoView(keptName);
@@ -100,18 +72,11 @@ test.describe('Positive flows', () => {
 });
 
 test.describe('Negative flows', () => {
-  test('TC-007: program list does not show stale data after failed creation', async ({ page, trackProgram }) => {
+  test('TC-007: program list does not show stale data after failed creation', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const existingName = uniqueName('Web Development 2026');
     const failedName = uniqueName('Unsaved Program');
-    const existingCreated = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(existingName, 'Full-stack web development program');
-    const existingBody = (await (await existingCreated).json()) as { data?: { id?: string } };
-    const existingId = existingBody.data?.id;
-    if (!existingId) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(existingId);
+    await programs.createProgram(existingName, 'Full-stack web development program', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(existingName);
     await expect(programs.programNameText(existingName)).toBeVisible();
     await page.route('**/api/programs', async (route) => {
@@ -137,18 +102,11 @@ test.describe('Negative flows', () => {
     await expect(programs.programNameText(existingName)).toBeVisible();
   });
 
-  test('TC-009: program list does not display internal or system fields', async ({ page, trackProgram }) => {
+  test('TC-009: program list does not display internal or system fields', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Web Development 2026');
     const description = 'Full-stack web development program';
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name, description);
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -161,36 +119,22 @@ test.describe('Negative flows', () => {
 });
 
 test.describe('Edge cases', () => {
-  test('TC-011: program with empty description displays gracefully in the list', async ({ page, trackProgram }) => {
+  test('TC-011: program with empty description displays gracefully in the list', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Minimal Program');
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name);
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, '', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
     await expect(programs.programCellByExactName(name)).toHaveText(name);
   });
 
-  test('TC-012: program with long name and description displays without breaking layout', async ({ page, trackProgram }) => {
+  test('TC-012: program with long name and description displays without breaking layout', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = nameOfLength(255);
     const marker = `D${Date.now()}`;
     const description = `${marker}${'D'.repeat(1000 - marker.length)}`;
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name, description);
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -213,18 +157,11 @@ test.describe('Edge cases', () => {
     expect(description).toHaveLength(1000);
   });
 
-  test('TC-013: program with special characters in name and description displays correctly', async ({ page, trackProgram }) => {
+  test('TC-013: program with special characters in name and description displays correctly', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const name = uniqueName('Informatique & IA - Niveau 2');
     const description = `Curriculum "advanced" & research ${Date.now()}`;
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name, description);
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, description, { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
 
@@ -233,7 +170,7 @@ test.describe('Edge cases', () => {
     await expect(descriptionText).toHaveText(description);
   });
 
-  test('TC-014: large number of programs displays with acceptable performance', async ({ page }) => {
+  test('TC-014: large number of programs displays with acceptable performance', { tag: '@regression' }, async ({ page }) => {
     const programs = new ProgramsPage(page);
     const loaded = page.waitForResponse((response) => isProgramsResponse(response, 'GET'));
     const started = Date.now();
@@ -249,18 +186,11 @@ test.describe('Edge cases', () => {
     expect(list.scrolls).toBe(true);
   });
 
-  test('TC-015: program list sort order is consistent', async ({ page, trackProgram }) => {
+  test('TC-015: program list sort order is consistent', { tag: '@regression' }, async ({ page, trackProgram }) => {
     const programs = new ProgramsPage(page);
     const names = [uniqueName('Alpha Program'), uniqueName('Beta Program'), uniqueName('Gamma Program')];
     for (const name of names) {
-      const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-      await programs.createProgram(name, 'Sort order check');
-      const body = (await (await created).json()) as { data?: { id?: string } };
-      const id = body.data?.id;
-      if (!id) {
-        throw new Error('Create program response did not include data.id');
-      }
-      trackProgram(id);
+      await programs.createProgram(name, 'Sort order check', { onCreated: trackProgram });
       await programs.scrollProgramNameIntoView(name);
       await expect(programs.programNameText(name)).toBeVisible();
     }
@@ -278,20 +208,13 @@ test.describe('Edge cases', () => {
     expect(orderOf(after)).toEqual(orderOf(before));
   });
 
-  test('TC-017: program list is accessible via keyboard navigation', async ({ page, browserName, trackProgram }) => {
+  test('TC-017: program list is accessible via keyboard navigation', { tag: '@regression' }, async ({ page, browserName, trackProgram }) => {
     // Playwright's WebKit build does not move DOM focus when Tab is pressed. The buttons are in the tab order (tabIndex 0).
     test.skip(browserName === 'webkit', 'Playwright WebKit does not move focus on Tab, so this keyboard flow cannot be driven there');
 
     const programs = new ProgramsPage(page);
     const name = uniqueName('Keyboard Program');
-    const created = page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
-    await programs.createProgram(name, 'Keyboard access check');
-    const body = (await (await created).json()) as { data?: { id?: string } };
-    const id = body.data?.id;
-    if (!id) {
-      throw new Error('Create program response did not include data.id');
-    }
-    trackProgram(id);
+    await programs.createProgram(name, 'Keyboard access check', { onCreated: trackProgram });
     await programs.scrollProgramNameIntoView(name);
     await expect(programs.programNameText(name)).toBeVisible();
     const edit = programs.editProgramButton(name);

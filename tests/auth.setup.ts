@@ -5,7 +5,7 @@ import { LoginPage } from '../pages/LoginPage';
 
 const authFile = path.resolve(__dirname, '../playwright/.auth/user.json');
 
-setup('authenticate', async ({ page }) => {
+setup('authenticate', { tag: '@smoke' }, async ({ page }) => {
   const login = new LoginPage(page);
   await login.gotoTestStudioLogin();
   await login.signInWithEnvCredentials();

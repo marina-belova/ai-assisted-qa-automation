@@ -40,13 +40,13 @@ Record that original locator. If the report does not name one locator, stop.
 
 ## Step 3 — Rediscover the element
 
-Use Playwright MCP `browser_snapshot` on the live page and read the accessibility tree.
+Prefer Playwright MCP `browser_snapshot` when that tool is in the session. Read the accessibility tree from the snapshot.
 
-Quote the element's role and its current accessible name from that tree. That quote is the evidence for the replacement.
+`agent -p` on a GitHub Actions runner does not have Playwright MCP. The self-heal job downloads the failed run's Playwright report. The accessibility tree is in `playwright-report/data/<sha1>.md`, the markdown error context. For a failed locator assertion it is the YAML block under `# Error details`. For other failures it may be under `# Page snapshot`. Read that file and quote the element's role and current accessible name from it. The workflow rejects a repair whose quote is not in that file. A trace zip, the HTML report, and a screenshot are not that tree.
 
-Do not guess the name. Do not take it from a screenshot. Do not use CSS or XPath. Do not invent a `data-testid`.
+Do not guess the name. Do not take it from a screenshot or an image. Do not use CSS or XPath. Do not invent a `data-testid`.
 
-If `browser_snapshot` is unavailable, stop and say the tree was not read. If the expected element is absent from the tree, stop and escalate. Absence is not locator drift.
+If neither a live `browser_snapshot` nor the saved accessibility tree is available, stop and say the tree was not read. If the expected element is absent from the tree, stop and escalate. Absence is not locator drift.
 
 ## Step 4 — Apply a minimal repair
 

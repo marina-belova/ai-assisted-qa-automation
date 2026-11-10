@@ -1,28 +1,56 @@
-# Draft. The weekday 06:00 UTC schedule is written below and left commented
-# out, so GitHub will not run it. A manual run stops before the agent until
-# CURSOR_API_KEY, ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL
-# are set as repository secrets.
+# Backlog Mode is manual. The weekday cron stays commented out.
+#
+# Self-heal runs after a failed "E2E Tests" workflow in this repository, or
+# from a manual dispatch that names that run. workflow_run uses the workflow
+# file on the default branch, then checks out the failed commit separately.
+# Fork code is not checked out. The agent does not receive a GitHub token.
+# A repair pull request is opened only after this job reruns the failed test
+# and tests/ is unchanged. The job never merges and never reports HEALED
+# before that rerun exits 0.
+#
+# CURSOR_API_KEY is required for the agent. It is not a Jira credential.
+# The Atlassian secrets are required only by the backlog job.
 
 name: Test generation
 
 on:
   # schedule:
-  #   # 06:00 UTC, Monday–Friday. Leave commented until the secrets above exist.
+  #   # 06:00 UTC, Monday–Friday. Leave commented until a human enables it.
   #   - cron: "0 6 * * 1-5"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: backlog, self-heal, or both
+        type: choice
+        options:
+          - backlog
+          - self-heal
+          - both
+        default: backlog
+      run_id:
+        description: Failed E2E Tests run id. Required when mode includes self-heal.
+        type: string
+        required: false
+  workflow_run:
+    workflows: ["E2E Tests"]
+    types:
+      - completed
 
 concurrency:
-  group: test-generation
+  group: ${{ github.event_name == 'workflow_run' && format('self-heal-{0}', github.event.workflow_run.id) || format('test-generation-dispatch-{0}', inputs.mode) }}
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  generate:
+  backlog:
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'backlog' || inputs.mode == 'both') }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       DIDAXIS_URL: ${{ secrets.DIDAXIS_URL }}
       DIDAXIS_EMAIL: ${{ secrets.DIDAXIS_EMAIL }}
@@ -39,6 +67,7 @@ jobs:
           DIDAXIS_EMAIL: ${{ secrets.DIDAXIS_EMAIL }}
           DIDAXIS_PASSWORD: ${{ secrets.DIDAXIS_PASSWORD }}
         run: |
+          set -euo pipefail
           missing=0
           for name in CURSOR_API_KEY ATLASSIAN_EMAIL ATLASSIAN_API_TOKEN ATLASSIAN_BASE_URL DIDAXIS_URL DIDAXIS_EMAIL DIDAXIS_PASSWORD; do
             if [ -z "${!name}" ]; then
@@ -47,7 +76,23 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "This workflow is a draft. It will not install the Cursor CLI, call Jira, or run Backlog Mode until every secret above is set. The weekday schedule stays commented out."
+            echo "Backlog Mode did not start. The weekday schedule stays commented out."
+            exit 1
+          fi
+
+      - name: Verify Jira API credentials
+        env:
+          ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+          ATLASSIAN_BASE_URL: ${{ secrets.ATLASSIAN_BASE_URL }}
+        run: |
+          set -euo pipefail
+          base="${ATLASSIAN_BASE_URL%/}"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            -u "${ATLASSIAN_EMAIL}:${ATLASSIAN_API_TOKEN}" \
+            "${base}/rest/api/3/myself")"
+          if [ "$code" != "200" ]; then
+            echo "::error::Jira REST auth failed (HTTP ${code}). Use ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL."
             exit 1
           fi
 
@@ -64,9 +109,14 @@ jobs:
 
       - name: Install Cursor CLI
         run: |
+          set -euo pipefail
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          if [ -d "$HOME/.cursor/bin" ]; then
+            echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          fi
+          export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+          command -v agent >/dev/null
 
       - name: Configure git
         run: |
@@ -80,26 +130,29 @@ jobs:
           ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
           ATLASSIAN_BASE_URL: ${{ secrets.ATLASSIAN_BASE_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKLOG_PROMPT: |
+            Backlog mode. This workflow is the external trigger. Follow .cursor/rules/qa-orchestration.mdc.
+
+            Queue, lowest key first, at most 5 tickets:
+            project = DS AND status = "In Progress" AND (labels is EMPTY OR labels != "tests-generated") ORDER BY key ASC
+
+            If that search returns no eligible tickets, write "0 eligible tickets" and exit successfully. Do not fail and do not change files.
+
+            Jira MCP is not available on this runner. Read and update Jira with the REST API using ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL. Use GH_TOKEN for git push and gh pr create. Do not print any secret.
+
+            For each ticket:
+            1. Analyze it with jira-ticket-to-gherkin and write the plan under Test Cases/<KEY>/.
+            2. Delegate the spec to test-writer. Specs stay under tests/. Do not modify application source.
+            3. Run that spec with npx playwright test.
+            4. On a failure, delegate diagnosis to triage. A repeated identical failure stops that ticket. Leave its pull request unmerged.
+            5. Open one pull request for that ticket. Put the DS key in the title and body.
+            6. Add the tests-generated label only after that pull request is successfully opened.
+
+            Never merge a pull request. Never push to main. Never close or transition the ticket. File a Jira bug only after explicit human approval.
         run: |
-          agent -p --force --trust --output-format text "$(cat <<'EOF'
-          Backlog mode. This workflow is the external trigger. Follow .cursor/rules/qa-orchestration.mdc.
-
-          Queue, lowest key first, at most 5 tickets:
-          project = DS AND status = "In Progress" AND (labels is EMPTY OR labels != "tests-generated") ORDER BY key ASC
-
-          Jira MCP is not available on this runner. Read and update Jira with the REST API using ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and ATLASSIAN_BASE_URL. Use GH_TOKEN for git push and gh pr create. Do not print any secret.
-
-          For each ticket:
-          1. Analyze it with jira-ticket-to-gherkin and write the plan under Test Cases/<KEY>/.
-          2. Delegate the spec to test-writer. Specs stay under tests/. Do not modify application source.
-          3. Run that spec with npx playwright test.
-          4. On a failure, delegate diagnosis to triage. A repeated identical failure stops that ticket. Leave its pull request unmerged.
-          5. Open one pull request for that ticket. Put the DS key in the title and body.
-          6. Add the tests-generated label only after that pull request is successfully opened.
-
-          Never merge a pull request. Never push to main. Never close or transition the ticket. File a Jira bug only after explicit human approval.
-          EOF
-          )"
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+          agent -p --force --trust --output-format text "$BACKLOG_PROMPT"
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -108,3 +161,425 @@ jobs:
           path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  self-heal:
+    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.mode == 'self-heal' || inputs.mode == 'both')) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Resolve the failed run
+        id: run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RUN_ID: ${{ github.event.inputs.run_id }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          WR_SHA: ${{ github.event.workflow_run.head_sha }}
+          WR_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WR_URL: ${{ github.event.workflow_run.html_url }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          WR_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          THIS_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          finish() {
+            {
+              echo "## Self-heal"
+              echo "Status: NOT HEALED"
+              echo "Reason: $1"
+              if [ -n "${2:-}" ]; then
+                echo "Run: $2"
+              fi
+            } > "$RUNNER_TEMP/self-heal-summary.md"
+          }
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            if [ "$WR_REPO" != "$THIS_REPO" ]; then
+              finish "The failed run is from another repository. Its code was not checked out."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            RUN_ID="$WR_ID"
+            SHA="$WR_SHA"
+            BRANCH="$WR_BRANCH"
+            URL="$WR_URL"
+            EVENT="$WR_EVENT"
+            NAME="E2E Tests"
+            CONCLUSION="failure"
+          else
+            if [ -z "$INPUT_RUN_ID" ]; then
+              finish "Manual self-heal requires the failed E2E run id."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if ! [[ "$INPUT_RUN_ID" =~ ^[0-9]+$ ]]; then
+              finish "The run id is not a number."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            meta="$(gh api "repos/${THIS_REPO}/actions/runs/${INPUT_RUN_ID}")"
+            RUN_ID="$INPUT_RUN_ID"
+            SHA="$(printf '%s' "$meta" | jq -r '.head_sha')"
+            BRANCH="$(printf '%s' "$meta" | jq -r '.head_branch')"
+            URL="$(printf '%s' "$meta" | jq -r '.html_url')"
+            EVENT="$(printf '%s' "$meta" | jq -r '.event')"
+            NAME="$(printf '%s' "$meta" | jq -r '.name')"
+            CONCLUSION="$(printf '%s' "$meta" | jq -r '.conclusion')"
+            HEAD_REPO="$(printf '%s' "$meta" | jq -r '.head_repository.full_name')"
+            if [ "$HEAD_REPO" != "$THIS_REPO" ]; then
+              finish "The failed run is from another repository. Its code was not checked out." "$URL"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          if [ "$NAME" != "E2E Tests" ] || [ "$CONCLUSION" != "failure" ]; then
+            finish "Run ${RUN_ID} is not a failed E2E Tests run (${NAME}, ${CONCLUSION})." "$URL"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            finish "Run ${RUN_ID} did not include a commit SHA." "$URL"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$BRANCH" == *..* ]]; then
+            finish "Run ${RUN_ID} is on an unexpected branch name." "$URL"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$BRANCH" in
+            fix/self-heal-*)
+              finish "Run ${RUN_ID} is already on a self-heal branch (${BRANCH})." "$URL"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          existing="$(gh pr list --repo "$THIS_REPO" --head "fix/self-heal-${RUN_ID}" --state open --json url --jq '.[0].url // empty')"
+          if [ -n "$existing" ]; then
+            finish "Run ${RUN_ID} already has an open repair pull request: ${existing}" "$URL"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "skip=false"
+            echo "run_id=${RUN_ID}"
+            echo "sha=${SHA}"
+            echo "branch=${BRANCH}"
+            echo "url=${URL}"
+            echo "event=${EVENT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.run.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.run.outputs.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Require the agent instructions from main
+        if: steps.run.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ steps.run.outputs.url }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            {
+              echo "## Self-heal"
+              echo "Status: NOT HEALED"
+              echo "Reason: $1"
+              echo "Run: ${RUN_URL}"
+            } > "$RUNNER_TEMP/self-heal-summary.md"
+            exit 1
+          }
+          git -c "http.extraheader=AUTHORIZATION: bearer ${GH_TOKEN}" fetch origin main
+          if ! git diff --exit-code origin/main -- .cursor package.json package-lock.json >/dev/null; then
+            refuse "The failed commit changes agent instructions or package manifests. The agent was not started."
+          fi
+          test -f .cursor/skills/self-heal/SKILL.md || refuse "The failed commit does not contain the self-heal skill."
+
+      - uses: actions/setup-node@v4
+        if: steps.run.outputs.skip != 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.run.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Download the failed Playwright report
+        if: steps.run.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-report
+          path: ${{ runner.temp }}/playwright-report
+          run-id: ${{ steps.run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Require an accessibility snapshot
+        if: steps.run.outputs.skip != 'true'
+        env:
+          RUN_URL: ${{ steps.run.outputs.url }}
+        run: |
+          set -euo pipefail
+          count="$(find "$RUNNER_TEMP/playwright-report" -type f -name '*.md' | wc -l | tr -d ' ')"
+          if [ "$count" = "0" ]; then
+            {
+              echo "## Self-heal"
+              echo "Status: NOT HEALED"
+              echo "Reason: The Playwright report has no accessibility snapshot."
+              echo "Run: ${RUN_URL}"
+            } > "$RUNNER_TEMP/self-heal-summary.md"
+            exit 1
+          fi
+
+      - name: Install Cursor CLI
+        if: steps.run.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          if [ -d "$HOME/.cursor/bin" ]; then
+            echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          fi
+          export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+          command -v agent >/dev/null
+
+      - name: Triage and repair one locator
+        if: steps.run.outputs.skip != 'true'
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+          RUN_URL: ${{ steps.run.outputs.url }}
+          FAILED_SHA: ${{ steps.run.outputs.sha }}
+          SELF_HEAL_PROMPT: |
+            You are the self-heal job for one failed E2E run. Follow .cursor/skills/ci-failure-triage/SKILL.md and .cursor/skills/self-heal/SKILL.md.
+
+            Playwright MCP browser_snapshot is not available on this runner. The accessibility tree is the Playwright page snapshot under the report directory given by REPORT_DIR. Quote the role and accessible name from that text. If the element is not in that tree, do not edit anything.
+
+            Do not call Jira. Do not create or label a Jira ticket. Do not push, and do not run gh pr create or gh pr merge. Do not print secrets. Do not edit tests/ or application source. Do not change assertions, expected values, or test data. Change at most one locator in one file under pages/.
+
+            Read the failed report, classify it, and write only SELF_HEAL_RESULT as JSON with these string fields:
+            classification, spec, title, pageObject, oldLocator, newLocator, evidence.
+            classification must be exactly one of: TEST ISSUE — LOCATOR DRIFT, Product defect, Test-code issue, Environment / credentials / flaky test, Unclassified.
+            evidence must be one single line copied from the accessibility snapshot. spec must be a tests/*.spec.ts path. pageObject must be a pages/*.ts path.
+            For any classification other than TEST ISSUE — LOCATOR DRIFT, leave the workspace unchanged and still write the JSON.
+            Do not write HEALED. This job reruns the test after you exit.
+        run: |
+          set -euo pipefail
+          if [ -z "${CURSOR_API_KEY}" ]; then
+            {
+              echo "## Self-heal"
+              echo "Status: NOT HEALED"
+              echo "Reason: Missing GitHub secret CURSOR_API_KEY. The agent was not started."
+              echo "Run: ${RUN_URL}"
+            } > "$RUNNER_TEMP/self-heal-summary.md"
+            exit 1
+          fi
+          export PATH="$HOME/.local/bin:$HOME/.cursor/bin:$PATH"
+          export REPORT_DIR="$RUNNER_TEMP/playwright-report"
+          export SELF_HEAL_RESULT="$RUNNER_TEMP/self-heal-result.json"
+          git config --unset-all http.https://github.com/.extraheader || true
+          env -u GITHUB_TOKEN -u GH_TOKEN \
+            agent -p --force --trust --output-format text \
+            "${SELF_HEAL_PROMPT}
+
+            Failed run: ${RUN_URL}
+            Failed commit: ${FAILED_SHA}
+            Report directory: ${REPORT_DIR}
+            Write the JSON result to: ${SELF_HEAL_RESULT}"
+
+      - name: Verify the repair and open the pull request
+        if: steps.run.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIDAXIS_URL: ${{ secrets.DIDAXIS_URL }}
+          DIDAXIS_EMAIL: ${{ secrets.DIDAXIS_EMAIL }}
+          DIDAXIS_PASSWORD: ${{ secrets.DIDAXIS_PASSWORD }}
+          DIDAXIS_API_TOKEN: ${{ secrets.DIDAXIS_API_TOKEN }}
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+          RUN_URL: ${{ steps.run.outputs.url }}
+          FAILED_SHA: ${{ steps.run.outputs.sha }}
+          BASE_BRANCH: ${{ steps.run.outputs.branch }}
+          VERIFY_PY: |
+            import json, pathlib, re, subprocess, sys
+            result_path, report_dir, sha = sys.argv[1:]
+            try:
+                data = json.loads(pathlib.Path(result_path).read_text())
+            except (OSError, json.JSONDecodeError):
+                json.dump({"decision": "error", "problems": "result JSON is unreadable", "classification": "", "spec": "", "title": "", "page": "", "old": "", "new": "", "evidence": ""}, sys.stdout)
+                sys.exit(0)
+            def field(name):
+                value = data.get(name)
+                if not isinstance(value, str):
+                    return ""
+                return " ".join(value.split())
+            classification = field("classification")
+            spec = field("spec")
+            title = field("title")
+            page = field("pageObject")
+            old = field("oldLocator")
+            new = field("newLocator")
+            evidence = field("evidence")
+            out = {"classification": classification, "spec": spec, "title": title, "page": page, "old": old, "new": new, "evidence": evidence, "problems": "", "decision": "invalid"}
+            drift = "TEST ISSUE — LOCATOR DRIFT"
+            if classification != drift:
+                out["decision"] = "not-drift"
+                json.dump(out, sys.stdout)
+                sys.exit(0)
+            problems = []
+            if not re.fullmatch(r"tests/[A-Za-z0-9._/-]+\.spec\.ts", spec):
+                problems.append("spec path")
+            raw_title = data.get("title")
+            if not isinstance(raw_title, str) or not title or "\n" in raw_title or len(title) > 300:
+                problems.append("test title")
+            if not re.fullmatch(r"pages/[A-Za-z0-9._/-]+\.ts", page):
+                problems.append("page object path")
+            if not old or not new or old == new:
+                problems.append("locator pair")
+            raw_evidence = data.get("evidence")
+            if not isinstance(raw_evidence, str) or "\n" in raw_evidence or not (3 <= len(evidence) <= 400):
+                problems.append("evidence shape")
+            blob = []
+            for path in pathlib.Path(report_dir).rglob("*.md"):
+                blob.append(path.read_text(encoding="utf-8", errors="replace"))
+            if evidence and evidence not in "\n".join(blob):
+                problems.append("evidence not in the accessibility snapshot")
+            status = subprocess.check_output(["git", "status", "--porcelain"], text=True)
+            changed = [line for line in status.splitlines() if line.strip()]
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+            names = []
+            if head != sha:
+                names = subprocess.check_output(["git", "diff", "--name-only", sha, "HEAD"], text=True).split()
+            work = []
+            for line in changed:
+                code = line[:2]
+                if code not in (" M", "M ", "MM"):
+                    problems.append("unexpected git status")
+                    break
+                work.append(line[3:])
+            paths = list(dict.fromkeys(names + work))
+            if len(paths) != 1 or not re.fullmatch(r"pages/[A-Za-z0-9._/-]+\.ts", paths[0]):
+                problems.append("diff is not one Page Object")
+            tests = subprocess.run(["git", "diff", "--exit-code", sha, "--", "tests"], capture_output=True)
+            if tests.returncode != 0:
+                problems.append("tests/ changed")
+            numstat = subprocess.check_output(["git", "diff", "--numstat", sha, "--", "pages"], text=True)
+            total = 0
+            for line in numstat.splitlines():
+                added, deleted, _path = line.split("\t", 2)
+                if added != "-" and deleted != "-":
+                    total += int(added) + int(deleted)
+            if total == 0 or total > 40:
+                problems.append("locator diff size")
+            if problems:
+                out["problems"] = "; ".join(dict.fromkeys(problems))
+            else:
+                out["decision"] = "ready"
+                out["page"] = paths[0]
+            json.dump(out, sys.stdout)
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/self-heal-result.json"
+          report="$RUNNER_TEMP/playwright-report"
+          summary="$RUNNER_TEMP/self-heal-summary.md"
+          write_status() {
+            {
+              echo "## Self-heal"
+              echo "Status: $1"
+              echo "Run: ${RUN_URL}"
+              echo "Commit: ${FAILED_SHA}"
+              echo "Classification: ${2:-unknown}"
+              echo "Failed test: ${3:-unknown}"
+              echo "Page Object: ${4:-unknown}"
+              echo "Old locator: ${5:-unknown}"
+              echo "New locator: ${6:-unknown}"
+              echo "Accessibility evidence: ${7:-none}"
+              echo "Rerun: ${8:-not run}"
+              echo "Repair pull request: ${9:-none}"
+              if [ -n "${10:-}" ]; then
+                echo "Reason: ${10}"
+              fi
+            } > "$summary"
+          }
+          if [ ! -f "$result" ]; then
+            write_status "NOT HEALED" "unknown" "unknown" "unknown" "unknown" "unknown" "none" "not run" "none" "The agent did not write a classification."
+            exit 1
+          fi
+          python3 -c "$VERIFY_PY" "$result" "$report" "$FAILED_SHA" > "$RUNNER_TEMP/decision.json"
+          field() {
+            python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2], ""))' "$RUNNER_TEMP/decision.json" "$1"
+          }
+          DECISION="$(field decision)"
+          CLASSIFICATION="$(field classification)"
+          SPEC="$(field spec)"
+          TITLE="$(field title)"
+          PAGE="$(field page)"
+          OLD="$(field old)"
+          NEW="$(field new)"
+          EVIDENCE="$(field evidence)"
+          PROBLEMS="$(field problems)"
+          if [ "$DECISION" = "not-drift" ]; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "not run" "none" "Triage did not confirm locator drift."
+            exit 0
+          fi
+          if [ "$DECISION" != "ready" ]; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "not run" "none" "${PROBLEMS:-the repair was not acceptable}"
+            exit 1
+          fi
+          if [ -z "${DIDAXIS_URL}" ] || [ -z "${DIDAXIS_EMAIL}" ] || [ -z "${DIDAXIS_PASSWORD}" ]; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "not run" "none" "DIDAXIS_URL, DIDAXIS_EMAIL, or DIDAXIS_PASSWORD is missing."
+            exit 1
+          fi
+          set +e
+          npx playwright test "$SPEC" -g "$TITLE" --project=chromium
+          rerun=$?
+          set -e
+          if [ "$rerun" -ne 0 ]; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "failed (exit ${rerun})" "none" "The repaired test did not pass."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- "$PAGE" || ! git diff --cached --quiet -- "$PAGE"; then
+            git add -- "$PAGE"
+            git commit -m "Repair the drifted locator from E2E run ${RUN_ID}."
+          fi
+          if ! git diff --exit-code "$FAILED_SHA" -- tests >/dev/null; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "passed" "none" "tests/ changed before the pull request was opened."
+            exit 1
+          fi
+          if git -c "http.extraheader=AUTHORIZATION: bearer ${GH_TOKEN}" ls-remote --heads origin "refs/heads/fix/self-heal-${RUN_ID}" | grep -q .; then
+            write_status "NOT HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "passed" "none" "A repair branch for this run already exists."
+            exit 0
+          fi
+          git -c "http.extraheader=AUTHORIZATION: bearer ${GH_TOKEN}" push origin "HEAD:refs/heads/fix/self-heal-${RUN_ID}"
+          python3 -c 'import json, os, pathlib, sys; d=json.load(open(sys.argv[1])); pathlib.Path(sys.argv[2]).write_text("\n".join(["Failed run: " + os.environ["RUN_URL"], "Failed commit: " + os.environ["FAILED_SHA"], "Classification: " + d["classification"], "Test: " + d["spec"] + " :: " + d["title"], "Page Object: " + d["page"], "Old locator: " + d["old"], "New locator: " + d["new"], "Accessibility evidence: " + d["evidence"], "Rerun: passed", "", "This pull request is not merged automatically.", ""]))' "$RUNNER_TEMP/decision.json" "$RUNNER_TEMP/pr-body.md"
+          pr_url="$(gh pr create --base "$BASE_BRANCH" --head "fix/self-heal-${RUN_ID}" --title "Repair locator drift from E2E run ${RUN_ID}" --body-file "$RUNNER_TEMP/pr-body.md")"
+          write_status "HEALED" "$CLASSIFICATION" "${SPEC} :: ${TITLE}" "$PAGE" "$OLD" "$NEW" "$EVIDENCE" "passed" "$pr_url"
+
+      - name: Publish the self-heal summary
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/self-heal-summary.md" ] && grep -q '^Status: HEALED$' "$RUNNER_TEMP/self-heal-summary.md"; then
+            cat "$RUNNER_TEMP/self-heal-summary.md" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ -f "$RUNNER_TEMP/self-heal-summary.md" ]; then
+            cat "$RUNNER_TEMP/self-heal-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Status: NOT HEALED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Reason: The job stopped before a verified repair." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if grep -q '^Status: HEALED$' "$GITHUB_STEP_SUMMARY"; then
+            echo "::error::Refusing a HEALED summary without the verification step."
+            exit 1
+          fi

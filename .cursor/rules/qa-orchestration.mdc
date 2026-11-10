@@ -41,7 +41,7 @@ During analysis, run live UI reconnaissance with Playwright MCP when credentials
 
 1. On a failed CI run, invoke CI failure triage before any repair.
 2. When triage reports `TEST ISSUE — LOCATOR DRIFT`, follow `.cursor/skills/self-heal/SKILL.md`:
-   - Rediscover the element with Playwright MCP `browser_snapshot`.
+   - Rediscover the element from the accessibility tree. Use Playwright MCP `browser_snapshot` when it is available. On GitHub Actions, use the accessibility snapshot saved from the failed run's Playwright report. Do not guess the name.
    - Patch that one Page Object locator. test-writer cannot edit `pages/`, so do not delegate this repair there.
    - Rerun the exact failed test and require a green result.
    - Require `git diff --exit-code <failed-sha> -- tests/` so the assertions are unchanged. The heal-gate hook does not prove that by itself.

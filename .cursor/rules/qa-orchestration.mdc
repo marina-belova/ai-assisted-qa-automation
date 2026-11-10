@@ -1,5 +1,5 @@
 ---
-description: How to drive a QA ticket or a red build to done by delegating to the test-writer, triage, and bug-reporter subagents.
+description: How to drive a QA ticket, a coverage gap, a backlog queue, or a red build to done by delegating to the test-writer, triage, and bug-reporter subagents.
 alwaysApply: true
 ---
 
@@ -16,24 +16,47 @@ You are the parent coordinator. Stay on this session's strong reasoning model, a
 - triage diagnoses a failed run and classifies the cause; it does not edit files or file bugs.
 - bug-reporter files a Jira bug for a confirmed application defect after human approval; it does not edit the repository.
 
-Apply `.cursor/skills/jira-ticket-to-gherkin/SKILL.md` to turn a Jira ticket into a test plan. Write that plan under `Test Cases/<KEY>/`. This repo has no `features/` directory.
-
 During analysis, run live UI reconnaissance with Playwright MCP when credentials are available. If credentials are missing, produce the plan anyway and say that recon was skipped. Do not invent selectors, UI behavior, or acceptance criteria.
+
+## Skills
+
+- **jira-ticket-to-gherkin** — a Jira ticket already exists. Read `.cursor/skills/jira-ticket-to-gherkin/SKILL.md` and turn it into a test plan under `Test Cases/<KEY>/`. This repo has no `features/` directory.
+- **explore-and-generate** — no Jira ticket. Read `.cursor/skills/explore-and-generate/SKILL.md`. Map `tests/`, explore the named page with Playwright MCP's accessibility tree, and keep that exploration read-only. Pick exactly one highest-value uncovered flow, write a Gherkin plan with a positive path and one edge case, and hand that plan to test-writer. Use it for "find what we're not testing", "explore <page> for untested flows", and "expand coverage". This skill must NOT be used when a Jira ticket already exists; use jira-ticket-to-gherkin instead.
 
 ## Routing
 
-- Ticket received → analyze Jira requirements and the UI → produce a test plan under `Test Cases/<KEY>/`.
+- Ticket received → analyze Jira requirements and the UI with **jira-ticket-to-gherkin** → produce a test plan under `Test Cases/<KEY>/`.
+- No ticket, or the request is "find what we're not testing", "explore <page> for untested flows", or "expand coverage" → **explore-and-generate** → one Gherkin plan, then the plan-ready path. Do not use explore-and-generate when a Jira ticket already exists.
 - Plan ready → delegate test implementation to test-writer.
 - Spec returned → run the relevant Playwright tests: `npx playwright test <spec>`.
 - Test run fails → delegate diagnosis to triage.
 - Confirmed application bug → delegate to bug-reporter only after explicit human approval.
 - Test-code issue → delegate the proposed fix to test-writer; a human approves before changes are applied.
+- Backlog or queue run → **Backlog mode**, one ticket at a time.
+
+## Backlog mode
+
+The agent never decides when to start. A Cursor Automation, a headless `agent -p` run, or a local batch starts the run. Do not drain this queue on your own.
+
+**Queue.** DS tickets in status "In Progress" that lack the `tests-generated` label:
+
+```
+project = DS AND status = "In Progress" AND (labels is EMPTY OR labels != "tests-generated") ORDER BY key ASC
+```
+
+**Budget.** At most 5 tickets per run. Leave the rest for the next trigger.
+
+**Per ticket.** Follow Routing for that key: analyze with jira-ticket-to-gherkin and write the plan under `Test Cases/<KEY>/` → delegate to test-writer → `npx playwright test <spec>` → on red, delegate to triage. A confirmed application bug goes to bug-reporter only after explicit human approval. A test-code fix goes to test-writer only after a human approves the change. The coordinator opens one pull request for that ticket. test-writer still writes and edits specs under `tests/` only. Put the DS key in the pull request title and body. When the pull request is open, add the `tests-generated` label on the ticket so the next run skips it.
+
+**Repeated identical failure.** Never rerun that same failing spec again. Stop the ticket, leave its pull request unmerged, add `tests-generated` if the pull request is open, and move to the next ticket.
+
+**Human gate.** Never merge a pull request. Never close or transition the ticket. A human approves every merge and every filed bug.
 
 ## Loop guard
 
 - At most 3 subagent delegations per task.
 - Never rerun the same failing spec more than twice.
-- When either limit is reached, stop and ask the human.
+- When either limit is reached, stop and ask the human. In Backlog mode, stop that ticket and move on.
 
 ## Approval
 
@@ -41,7 +64,7 @@ A human approves any merge and any Jira bug before it is created.
 
 ## Done
 
-The relevant tests pass, or a confirmed application bug has been filed and linked with human approval.
+The relevant tests pass, or a confirmed application bug has been filed and linked with human approval. In Backlog mode, each taken ticket has one open pull request that names its DS key and the `tests-generated` label. Nothing was merged or transitioned.
 
 ## Reporting
 

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { waitUntilDialogsClosed } from './dialog-sync';
 import { isProgramsResponse } from './program-api';
+import { ProgramsPage } from './ProgramsPage';
 
 export class NewProgramModal {
   readonly dialog;
@@ -41,15 +42,25 @@ export class NewProgramModal {
     const created = this.page.waitForResponse((response) => isProgramsResponse(response, 'POST'));
     await this.clickCreate();
     const response = await created;
-    const body = (await response.json()) as { data?: { id?: string } };
+    const body = (await response.json()) as { data?: { id?: string; name?: string } };
     const uuid = body.data?.id;
+    const name = body.data?.name;
     if (!uuid) {
       throw new Error('Create program response did not include data.id');
     }
+    if (!name) {
+      throw new Error('Create program response did not include data.name');
+    }
     await this.dialog.waitFor({ state: 'hidden', timeout: 15_000 });
     await waitUntilDialogsClosed(this.page);
+    const listed = this.page.waitForResponse((response) => isProgramsResponse(response, 'GET'), {
+      timeout: 45_000,
+    });
     await this.page.reload();
-    await this.page.getByRole('button', { name: '+ New Program', exact: true }).waitFor({ state: 'visible' });
+    await listed;
+    const programs = new ProgramsPage(this.page);
+    await programs.newProgramButton.waitFor({ state: 'visible' });
+    await programs.programNameText(name).waitFor({ state: 'visible', timeout: 45_000 });
     return uuid;
   }
 

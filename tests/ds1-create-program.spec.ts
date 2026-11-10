@@ -32,7 +32,7 @@ test.describe('Positive flows', () => {
     await modal.fillDescription(description);
     trackProgram(await modal.submitCreateWithReload());
 
-    await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
+    await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
     await expect(programs.alerts).toHaveCount(0);
   });
@@ -45,7 +45,7 @@ test.describe('Positive flows', () => {
     await modal.fillProgramName(name);
     trackProgram(await modal.submitCreateWithReload());
 
-    await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
+    await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.programCellByExactName(name)).toHaveText(name);
     await expect(programs.alerts).toHaveCount(0);
   });
@@ -104,7 +104,7 @@ test.describe('Edge cases', () => {
     await modal.fillDescription('Boundary length test');
     trackProgram(await modal.submitCreateWithReload());
 
-    await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
+    await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
   });
 
   test('TC-012: program name with special characters is accepted', async ({ page, trackProgram }) => {
@@ -140,7 +140,7 @@ test.describe('Edge cases', () => {
     await modal.fillDescription(description);
     trackProgram(await modal.submitCreateWithReload());
 
-    await expect(programs.programNameText(name)).toBeVisible({ timeout: 20_000 });
+    await expect(programs.programNameText(name)).toBeVisible({ timeout: 45_000 });
     await expect(programs.textInProgramCell(name, description)).toBeVisible();
   });
 

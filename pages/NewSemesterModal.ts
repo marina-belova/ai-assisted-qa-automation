@@ -35,4 +35,8 @@ export class NewSemesterModal {
     await this.cancelButton.click();
     await this.dialog.waitFor({ state: 'hidden' });
   }
+
+  async clickCreate(): Promise<void> {
+    await this.createButton.click();
+  }
 }

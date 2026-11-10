@@ -100,6 +100,10 @@ export class ProgramsPage {
     return this.page.getByRole('heading', { name, exact: true, level: 4 });
   }
 
+  semesterText(text: string) {
+    return this.page.getByText(text, { exact: true });
+  }
+
   async selectProgram(name: string): Promise<void> {
     const cell = this.programCell(name);
     await cell.scrollIntoViewIfNeeded({ timeout: 45_000 });

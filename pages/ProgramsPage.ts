@@ -14,7 +14,7 @@ export class ProgramsPage {
   readonly noSemestersMessage;
 
   constructor(private readonly page: Page) {
-    this.newProgramButton = page.getByRole('button', { name: '+ New Program', exact: true });
+    this.newProgramButton = page.getByRole('button', { name: '+ New Program drifted', exact: true });
     this.alerts = page.getByRole('alert');
     this.table = page.getByRole('table');
     this.addSemesterButton = page.getByRole('button', { name: '+ Semester', exact: true });

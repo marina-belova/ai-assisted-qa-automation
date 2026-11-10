@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/generation-gate.sh",
+        "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/heal-gate.sh",
+        "failClosed": true
+      }
+    ]
+  }
+}

@@ -4,16 +4,21 @@ import { isProgramItemResponse, isProgramsResponse } from './program-api';
 import { waitUntilDialogsClosed } from './dialog-sync';
 import { EditProgramModal } from './EditProgramModal';
 import { NewProgramModal } from './NewProgramModal';
+import { NewSemesterModal } from './NewSemesterModal';
 
 export class ProgramsPage {
   readonly newProgramButton;
   readonly alerts;
   readonly table;
+  readonly addSemesterButton;
+  readonly noSemestersMessage;
 
   constructor(private readonly page: Page) {
     this.newProgramButton = page.getByRole('button', { name: '+ New Program', exact: true });
     this.alerts = page.getByRole('alert');
     this.table = page.getByRole('table');
+    this.addSemesterButton = page.getByRole('button', { name: '+ Semester', exact: true });
+    this.noSemestersMessage = page.getByText('No semesters yet', { exact: true });
   }
 
   async goto(): Promise<void> {
@@ -89,6 +94,27 @@ export class ProgramsPage {
   async openNewProgramForm(): Promise<NewProgramModal> {
     await this.newProgramButton.click();
     return new NewProgramModal(this.page);
+  }
+
+  semesterPanelHeading(name: string) {
+    return this.page.getByRole('heading', { name, exact: true, level: 4 });
+  }
+
+  semesterText(text: string) {
+    return this.page.getByText(text, { exact: true });
+  }
+
+  async selectProgram(name: string): Promise<void> {
+    const cell = this.programCell(name);
+    await cell.scrollIntoViewIfNeeded({ timeout: 45_000 });
+    await cell.click();
+  }
+
+  async openNewSemesterForm(): Promise<NewSemesterModal> {
+    await this.addSemesterButton.click();
+    const modal = new NewSemesterModal(this.page);
+    await modal.dialog.waitFor({ state: 'visible' });
+    return modal;
   }
 
   async createProgram(name: string, description = '', options?: { reloadAfterCreate?: boolean }): Promise<string | void> {
